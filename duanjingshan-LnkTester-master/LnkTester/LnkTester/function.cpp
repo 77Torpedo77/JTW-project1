@@ -26,6 +26,133 @@ int iRcvUnknownCount = 0;  //收到不明来源数据总次数
 void print_statistics();
 void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
+
+U8* creatCrc(unsigned long src, unsigned long check)//将字节数组或者bit数组转化为unsigned long类型 用unsigned long decode(U8 A[], int length);  //解编比特数组
+{
+	unsigned long src1 = src;
+	unsigned long check1 = check;
+	int src_blen = 0;
+	int check_blen = 0;
+	unsigned long dividend = 0;
+	unsigned long divisor = 0;
+	unsigned long flag = 1;//判断被除数最高位是否为1
+	int flag_init_blen = 0;
+	int temp = 0;//用于存最初的被除数
+	U8* src_fcs;
+	for (src_blen; src1 > 0; src_blen++)
+	{
+		src1 >>= 1;
+	}
+	for (check_blen; check1 > 0; check_blen++)
+	{
+		check1 >>= 1;
+	}
+	src1 = src;
+	check1 = check;
+	//构造被除数（填充比check_blen少1的0）
+	for (int i = check_blen; i > 1; i--)
+	{
+		src1 <<= 1;
+	}
+	dividend = src1;
+	src1 = src;
+
+	//构造除数（与被除数等长）
+	for (int i = src_blen; i > 1; i--)
+	{
+		check1 <<= 1;
+	}
+	divisor = check1;
+	check1 = check;
+
+
+	temp = dividend;
+	flag_init_blen = src_blen + check_blen - 1;
+	for (int i = 1; i < flag_init_blen; i++)
+	{
+		flag <<= 1;
+	}
+	for (int i = src_blen; i > 0; i--)
+	{
+		if (flag == (flag & dividend))
+		{
+
+			dividend ^= divisor;
+		}
+		flag >>= 1;
+		divisor >>= 1;
+	}
+	src_fcs = (U8*)malloc(sizeof(U8) * flag_init_blen);
+	code(dividend + temp, src_fcs, flag_init_blen);
+	/*printf("src_fcs：");
+	for (int i = 0; i < flag_init_blen; i++)
+	{
+
+		printf("%d ", src_fcs[i]);
+	}*/
+	return src_fcs;
+}
+
+bool checkCrc(unsigned long src_fcs, unsigned long check)//校验正确返回true，//将字节数组或者bit数组转化为unsigned long类型 用unsigned long decode(U8 A[], int length);  //解编比特数组
+{
+	unsigned long src1 = src_fcs;
+	unsigned long check1 = check;
+	int src_blen = 0;
+	int check_blen = 0;
+	unsigned long dividend = 0;
+	unsigned long divisor = 0;
+	unsigned long flag = 1;//判断被除数最高位是否为1
+	int flag_init_blen = 0;
+	int temp = 0;//用于存最初的被除数
+
+	for (src_blen; src1 > 0; src_blen++)
+	{
+		src1 >>= 1;
+	}
+	for (check_blen; check1 > 0; check_blen++)
+	{
+		check1 >>= 1;
+	}
+	src1 = src_fcs;
+	check1 = check;
+	//构造被除数（填充比check_blen少1的0）
+	for (int i = check_blen; i > 1; i--)
+	{
+		src1 <<= 1;
+	}
+	dividend = src1;
+	src1 = src_fcs;
+
+	//构造除数（与被除数等长）
+	for (int i = src_blen; i > 1; i--)
+	{
+		check1 <<= 1;
+	}
+	divisor = check1;
+	check1 = check;
+
+
+	temp = dividend;
+	flag_init_blen = src_blen + check_blen - 1;
+	for (int i = 1; i < flag_init_blen; i++)
+	{
+		flag <<= 1;
+	}
+	for (int i = src_blen; i > 0; i--)
+	{
+		if (flag == (flag & dividend))
+		{
+
+			dividend ^= divisor;
+		}
+		flag >>= 1;
+		divisor >>= 1;
+	}
+	//printf("\ncheck:%d\n", !dividend);
+	return !dividend;
+}
+
+
 //***************重要函数提醒******************************
 //名称：InitFunction
 //功能：初始化功能面，由main函数在读完配置文件，正式进入驱动机制前调用
