@@ -38,7 +38,7 @@ U8* creatCrc(unsigned long src, unsigned long check)//½«×Ö½ÚÊý×é»òÕßbitÊý×é×ª»¯Î
 	unsigned long flag = 1;//ÅÐ¶Ï±»³ýÊý×î¸ßÎ»ÊÇ·ñÎª1
 	int flag_init_blen = 0;
 	int temp = 0;//ÓÃÓÚ´æ×î³õµÄ±»³ýÊý
-	U8* src_fcs;
+	U8* fcs;
 	for (src_blen; src1 > 0; src_blen++)
 	{
 		src1 >>= 1;
@@ -82,20 +82,28 @@ U8* creatCrc(unsigned long src, unsigned long check)//½«×Ö½ÚÊý×é»òÕßbitÊý×é×ª»¯Î
 		flag >>= 1;
 		divisor >>= 1;
 	}
-	src_fcs = (U8*)malloc(sizeof(U8) * flag_init_blen);
-	code(dividend + temp, src_fcs, flag_init_blen);
+	//src_fcs = (U8*)malloc(sizeof(U8) * flag_init_blen);
+	//code(dividend + temp, src_fcs, flag_init_blen);
 	/*printf("src_fcs£º");
 	for (int i = 0; i < flag_init_blen; i++)
 	{
 
 		printf("%d ", src_fcs[i]);
 	}*/
-	return src_fcs;
+	fcs = (U8*)malloc(sizeof(U8) * flag_init_blen);
+	code(dividend, fcs, check_blen - 1);
+	printf("fcs£º");
+	for (int i = 0; i < check_blen - 1; i++)
+	{
+
+		printf("%d ", fcs[i]);
+	}
+	return fcs;
 }
 
 bool checkCrc(unsigned long src_fcs, unsigned long check)//Ð£ÑéÕýÈ··µ»Øtrue£¬//½«×Ö½ÚÊý×é»òÕßbitÊý×é×ª»¯Îªunsigned longÀàÐÍ ÓÃunsigned long decode(U8 A[], int length);  //½â±à±ÈÌØÊý×é
 {
-	unsigned long src1 = src_fcs;
+	unsigned long src1 = src_fcs; //11110000 0000 0000 ....
 	unsigned long check1 = check;
 	int src_blen = 0;
 	int check_blen = 0;
@@ -217,16 +225,33 @@ void RecvfromUpper(U8* buf, int len)
 {
 	int iSndRetval;
 	U8* bufSend = NULL;
+	U8* fcs = NULL;
+	U8* new_bit_buf = NULL;
+	U8* new_buf = NULL;
 	//ÊÇ¸ß²ãÊý¾Ý£¬Ö»´Ó½Ó¿Ú0·¢³öÈ¥,¸ß²ã½Ó¿ÚÄ¬ÈÏ¶¼ÊÇ×Ö½ÚÁ÷Êý¾Ý¸ñÊ½
 	if (lowerMode[0] == 0) {
 		//U8 testArray[90] = { 0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0 };
 		//½Ó¿Ú0µÄÄ£Ê½ÎªbitÊý×é£¬ÏÈ×ª»»³ÉbitÊý×é£¬·Åµ½bufSendÀï
-		bufSend = (char*)malloc(len * 8);
+		/*bufSend = (char*)malloc(len * 8);
 		if (bufSend == NULL) {
 			return;
-		}
+		}*/
 		int return_data_len = 0;
-		bufSend = MakeFrame(buf, len, &return_data_len);
+		U8* bit_buf = (U8*)malloc(sizeof(len * 8));
+
+		ByteArrayToBitArray(bit_buf, len * 8,buf,len);
+		fcs=creatCrc(decode(bit_buf, len * 8), 49157);
+		//newbuf=(U8*)malloc(sizeof(U8)*len*8+15)
+		new_bit_buf = (U8*)malloc(sizeof(U8) * (len * 8 + 16));
+		for (int i = 0; i < len * 8; i++)
+			new_bit_buf[i] = bit_buf[i];
+		for (int i = 0; i < 15; i++)//ÒòÎª²ÉÓÃµÄÊÇCRC16
+			new_bit_buf[len * 8 + i] = fcs[i];
+		new_bit_buf[len * 8 + 15] = 0;//ÎªÁËºÍMakeFrame()¼æÈÝ,ÊÕ¶ËµÃÓÒÒÆÒ»Î»È¥0
+		U8* new_buf = (U8*)malloc(sizeof(len+2));
+		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
+
+		bufSend = MakeFrame(new_buf, len+2, &return_data_len);
 		//iSndRetval = ByteArrayToBitArray(bufSend, len * 8, buf, len);
 		//·¢ËÍ
 		//iSndRetval = SendtoLower(bufSend, iSndRetval, 0); //²ÎÊýÒÀ´ÎÎªÊý¾Ý»º³å£¬³¤¶È£¬½Ó¿ÚºÅ
