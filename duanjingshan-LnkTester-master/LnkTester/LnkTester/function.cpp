@@ -240,14 +240,13 @@ void RecvfromUpper(U8* buf, int len)
 		U8* bit_buf = (U8*)malloc(sizeof(len * 8));
 
 		ByteArrayToBitArray(bit_buf, len * 8,buf,len);
-		fcs=creatCrc(decode(bit_buf, len * 8), 49157);
+		fcs=creatCrc(decode(bit_buf, len * 8), 98309);
 		//newbuf=(U8*)malloc(sizeof(U8)*len*8+15)
 		new_bit_buf = (U8*)malloc(sizeof(U8) * (len * 8 + 16));
 		for (int i = 0; i < len * 8; i++)
 			new_bit_buf[i] = bit_buf[i];
-		for (int i = 0; i < 15; i++)//因为采用的是CRC16
+		for (int i = 0; i < 16; i++)//因为采用的是CRC16
 			new_bit_buf[len * 8 + i] = fcs[i];
-		new_bit_buf[len * 8 + 15] = 0;//为了和MakeFrame()兼容,收端得右移一位去0
 		U8* new_buf = (U8*)malloc(sizeof(len+2));
 		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
 
