@@ -254,13 +254,8 @@ void RecvfromUpper(U8* buf, int len)
 	U8* new_buf = NULL;
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
-		//U8 testArray[90] = { 0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0 };
-		//接口0的模式为bit数组，先转换成bit数组，放到bufSend里
-		/*bufSend = (char*)malloc(len * 8);
-		if (bufSend == NULL) {
-			return;
-		}*/
 		int return_data_len = 0;
+		len = makeFrameHead(buf,0x03,0xff,len);
 		U8* bit_buf = (U8*)malloc(sizeof(len * 8));
 
 		ByteArrayToBitArray(bit_buf, len * 8,buf,len);
@@ -275,11 +270,9 @@ void RecvfromUpper(U8* buf, int len)
 		U8* new_buf = (U8*)malloc(sizeof(len+2));
 		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
 
+
 		bufSend = MakeFrame(new_buf, len+2, &return_data_len);
-		//iSndRetval = ByteArrayToBitArray(bufSend, len * 8, buf, len);
-		//发送
-		//iSndRetval = SendtoLower(bufSend, iSndRetval, 0); //参数依次为数据缓冲，长度，接口号
-		iSndRetval = SendtoLower(bufSend, return_data_len,0); //参数依次为数据缓冲，长度，接口号
+		iSndRetval = SendtoLower(bufSend, return_data_len,0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
 	}
 	else {
 		//下层是字节数组接口，可直接发送
@@ -394,9 +387,31 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 				cout << "内存空间不够，导致数据没有被处理" << endl;
 				return;
 			}
-			iSndRetval = BitArrayToByteArray(buf, len, bufSend, len / 8 + 1);
-			iSndRetval = SendtoUpper(bufSend, iSndRetval);
-			iSndRetval = iSndRetval * 8;//换算成位,进行统计
+			U8* true_data = (U8*)malloc(sizeof(U8) * (len / 8 + 1));//true_data:去掉定位符的数据,bit数组
+			int true_data_len = 0;
+			true_data = getFrame(buf, &true_data_len);
+			if (checkCrc(decode(true_data, true_data_len), 98309))
+			{
+				U8* true_data_byte=(U8*)malloc(sizeof(U8) * (true_data_len / 8 ));
+				BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
+				switch (true_data_byte[1]) {
+					case 0x03:
+						iSndRetval = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
+						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
+						iSndRetval = iSndRetval * 8;//换算成位,进行统计
+						//发送确认
+						break;
+					case 0x01:
+						//如果是确认帧，取消超时重传
+						break;
+				}
+			}
+			else {
+				//请求重传
+
+			}
+			
+			
 
 		}
 		else {
