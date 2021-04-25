@@ -558,3 +558,59 @@ U8* MakeFrame(U8* byte_data,int len, int* return_data_len)
 	//int a = BitArrayToByteArray(testArray, 26, reArray, 200);
 	return sendBitArray;
 }
+
+U8* getFrame(U8* bit_data , int* len)
+{
+	int get_head = 0, get_tail = 0, head = -1, tail = -1;
+	for (int i = 0;i<=10000 && get_tail == 0; i++)
+	{
+		if (bit_data[i] == 0 && 
+			bit_data[i + 1] == 1 && 
+			bit_data[i + 2] == 1 &&
+			bit_data[i + 3] == 1 &&
+			bit_data[i + 4] == 1 &&
+			bit_data[i + 5] == 1 &&
+			bit_data[i + 6] == 1 &&
+			bit_data[i + 7] == 0 && get_head==0 && get_tail==0)
+		{
+			get_head = 1;
+			head = i + 8;
+			i += 8;
+		}
+
+		if (bit_data[i] == 0 &&
+			bit_data[i + 1] == 1 &&
+			bit_data[i + 2] == 1 &&
+			bit_data[i + 3] == 1 &&
+			bit_data[i + 4] == 1 &&
+			bit_data[i + 5] == 1 &&
+			bit_data[i + 6] == 1 &&
+			bit_data[i + 7] == 0 && get_head == 0 && get_tail == 0)
+		{
+			get_tail = 1;
+			tail = i - 1;
+		}
+	}
+
+	U8* return_bit_data = (U8*)malloc(sizeof(U8) * (tail - head + 1));
+	int count = 0;
+	int j = 0;
+	for (int i = head ; i <= tail; i++,j++)
+	{
+		return_bit_data[j] = bit_data[i];
+		if (return_bit_data[j] == 1)
+		{
+			count += 1;
+		}
+		if (count == 5) {
+			i++;
+			count = 0;
+		}
+		if (return_bit_data[j] == 0)
+		{
+			count = 0;
+		}
+	}
+	*len = j - 1;
+	return return_bit_data;
+}
