@@ -340,7 +340,7 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
 						iSndRetval = iSndRetval * 8;//换算成位,进行统计
 						//发送ACK确认
-						SendtoUpper(ack_array, 7);
+						SendtoLower(ack_array, 7 , 0);
 						break;
 					case 0x01:
 						//如果是确认帧，取消超时重传
