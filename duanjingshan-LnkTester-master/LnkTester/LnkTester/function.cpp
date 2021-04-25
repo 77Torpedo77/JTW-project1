@@ -43,16 +43,14 @@ U8* makeFrameHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地
 	
 	return new_buf;
 }
-int removeFrameHeadAndFCS(U8* buf,int len)//传入帧带头的字节数组去头和CRC16校验码，返回去头后和FCS的长度
+U8* removeFrameHeadAndFCS(U8* buf,int len)//传入帧带头的字节数组去头和CRC16校验码，返回去头后和FCS的长度
 {
 	U8* new_buf = (U8*)malloc(sizeof(U8) * (len - 4));
 	for (int i = 0; i < len - 4;i++)
 	{
 		new_buf[i] = buf[2 + i];
 	}
-	free(buf);//释放原来buf
-	buf = new_buf;
-	return len - 4;
+	return new_buf;
 }
 
 unsigned short int GICREN_CalcCRC16(unsigned char* data, unsigned char len)
@@ -182,7 +180,7 @@ void RecvfromUpper(U8* buf, int len)
 		for (int i = 0; i < 16; i++)//因为采用的是CRC16
 			new_bit_buf[len * 8 + i] = fcs[i];
 		new_buf = (U8*)malloc(sizeof(U8)* (len + 2));
-		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
+		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 3);
 
 		free(fcs);
 		free(new_bit_buf);
@@ -318,7 +316,8 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 			{
 				switch (true_data_byte[1]) {
 					case 0x03:
-						iSndRetval = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
+						true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
+						iSndRetval = true_data_len / 8 - 4;
 						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
 						iSndRetval = iSndRetval * 8;//换算成位,进行统计
 						//发送确认
