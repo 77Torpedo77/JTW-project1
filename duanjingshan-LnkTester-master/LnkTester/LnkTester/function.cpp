@@ -29,6 +29,7 @@ int is_timeout = 1;//超时重传标志位
 int start_timeout = 0;//开始超时重传检测标志位
 U8* resent_buf = NULL;//重传指针记录
 int resent_len = 0;//重传长度记录
+U8 ack_array[7] = { 0x7E,0xff,0x01,0x00,0x04,0x0c,0x7E };//ack帧
 
 
 //打印统计信息
@@ -339,7 +340,6 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
 						iSndRetval = iSndRetval * 8;//换算成位,进行统计
 						//发送ACK确认
-						U8 ack_array[7] = { 0x7E,0xff,0x01,0x00,0x04,0x0c,0x7E };
 						SendtoUpper(ack_array, 7);
 						break;
 					case 0x01:
