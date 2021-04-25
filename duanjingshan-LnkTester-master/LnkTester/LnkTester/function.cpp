@@ -312,10 +312,10 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 			U8* true_data = (U8*)malloc(sizeof(U8) * (len / 8 + 1));//true_data:去掉定位符的数据,bit数组
 			int true_data_len = 0;
 			true_data = getFrame(buf, &true_data_len);
-			if (checkCrc(decode(true_data, true_data_len), 98309))
+			U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
+			BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
+			if (checkCrc(true_data_byte, true_data_len/8))
 			{
-				U8* true_data_byte=(U8*)malloc(sizeof(U8) * (true_data_len / 8 ));
-				BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
 				switch (true_data_byte[1]) {
 					case 0x03:
 						iSndRetval = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
