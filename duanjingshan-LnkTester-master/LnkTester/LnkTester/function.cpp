@@ -24,6 +24,12 @@ int iRcvForwardCount = 0; //转发数据总次数
 int iRcvToUpper = 0;      //从低层递交高层数据总量
 int iRcvToUpperCount = 0;  //从低层递交高层数据总次数
 int iRcvUnknownCount = 0;  //收到不明来源数据总次数
+int time_count = 0; // TimeOut用的计数器
+int is_timeout = 1;//超时重传标志位
+int start_timeout = 0;//开始超时重传检测标志位
+U8* resent_buf = NULL;//重传指针记录
+int resent_len = 0;//重传长度记录
+
 
 //打印统计信息
 void print_statistics();
@@ -137,7 +143,15 @@ void TimeOut()
 		//键盘有动作，进入菜单模式
 		menu();
 	}
+	if (start_timeout == 1)
+	{
+		time_count++;
+		if (time_count == 100)//5000ms
+		{
+			SendtoLower(resent_buf, resent_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
 
+		}
+	}
 	print_statistics();
 }
 //------------华丽的分割线，以下是数据的收发,--------------------------------------------
@@ -160,10 +174,9 @@ void RecvfromUpper(U8* buf, int len)
 	U8* new_bit_buf = NULL;
 	U8* new_buf = NULL;
 	U8* new_buf_head = NULL;
-
+	int return_data_len = 0;
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
-		int return_data_len = 0;
 		new_buf_head = makeFrameHead(buf, 0x03, 0xff, len);
 		len = len + 2;//多了头部2字节
 		U8* bit_buf = (U8*)malloc(sizeof(U8) * (len * 8));
@@ -183,6 +196,8 @@ void RecvfromUpper(U8* buf, int len)
 		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
 		bufSend = MakeFrame(new_buf, len + 2, &return_data_len);
 		iSndRetval = SendtoLower(bufSend, return_data_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+		Sleep(50);
+		start_timeout = 1;//开始计时
 		free(new_buf);
 		free(fcs);
 		free(new_bit_buf);
@@ -196,9 +211,11 @@ void RecvfromUpper(U8* buf, int len)
 	//如果考虑设计停等协议等重传协议，这份数据需要缓冲起来，应该另外申请空间，把buf或bufSend的内容保存起来，以备重传
 	if (bufSend != NULL) {
 		//保存bufSend内容，CODES NEED HERE
-
+		//resent_buf = (U8*)malloc(sizeof(U8) * return_data_len);
+		resent_buf = bufSend;
+		resent_len = return_data_len;
 		//本例程没有设计重传协议，不需要保存数据，所以将空间释放
-		free(bufSend);
+		//free(bufSend);
 	}
 	else {
 		//保存buf内容，CODES NEED HERE
@@ -321,16 +338,19 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 						iSndRetval = true_data_len / 8 - 4;
 						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
 						iSndRetval = iSndRetval * 8;//换算成位,进行统计
-						//发送确认
+						//发送ACK确认
+						U8 ack_array[7] = { 0x7E,0xff,0x01,0x00,0x04,0x0c,0x7E };
+						SendtoUpper(ack_array, 7);
 						break;
 					case 0x01:
 						//如果是确认帧，取消超时重传
+						start_timeout = 0;
 						break;
 				}
 			}
-			else {
-				//请求重传
-
+			else //校验出错误
+			{
+				//不发ACK，什么都不干
 			}
 			
 			
