@@ -27,6 +27,30 @@ void print_statistics();
 void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
 
+int makeFrameHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地址和控制字段均为1个字节（默认分别为0XFF和0X03），buf为字节数组，len为字节数组长度
+{													  //ctr-----0x03表示为数据帧 0x01表示为ack帧 0x02表示为syn帧 0x00为fin帧
+	U8* new_buf = (U8*)malloc(sizeof(U8) * (len + 2));
+	new_buf[0] = addr;
+	new_buf[1] = ctr;
+	if(len>0)
+	for (int i = 0; i < len + 2; i++)
+		new_buf[2 + i] = buf[i];
+	free(buf);//释放原来buf
+	buf = new_buf;
+	return len + 2;
+}
+int removeFrameHeadAndFCS(U8* buf,int len)//传入帧带头的字节数组去头和CRC16校验码，返回去头后和FCS的长度
+{
+	U8* new_buf = (U8*)malloc(sizeof(U8) * (len - 4));
+	for (int i = 0; i < len - 4;i++)
+	{
+		new_buf[i] = buf[2 + i];
+	}
+	free(buf);//释放原来buf
+	buf = new_buf;
+	return len - 4;
+}
+
 U8* creatCrc(unsigned long src, unsigned long check)//将字节数组或者bit数组转化为unsigned long类型 用unsigned long decode(U8 A[], int length);  //解编比特数组
 {
 	unsigned long src1 = src;
@@ -241,6 +265,7 @@ void RecvfromUpper(U8* buf, int len)
 
 		ByteArrayToBitArray(bit_buf, len * 8,buf,len);
 		fcs=creatCrc(decode(bit_buf, len * 8), 98309);
+		
 		//newbuf=(U8*)malloc(sizeof(U8)*len*8+15)
 		new_bit_buf = (U8*)malloc(sizeof(U8) * (len * 8 + 16));
 		for (int i = 0; i < len * 8; i++)
