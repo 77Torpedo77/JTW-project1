@@ -5,6 +5,9 @@
 #include "stdio.h"
 #include "CfgFileParms.h"
 #include "function.h"
+
+typedef unsigned short 		u16;
+
 using namespace std;
 
 //ÒÔÏÂÎªÖØÒªµÄ±äÁ¿
@@ -28,17 +31,17 @@ void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
 U8* getFrame(U8* bit_data, int* len);
 
-int makeFrameHead(U8* buf, int ctr, int addr, int len)//²ÉÓÃÀàËÆHDLCÖ¡Í·¸ñÊ½£¬µØÖ·ºÍ¿ØÖÆ×Ö¶Î¾ùÎª1¸ö×Ö½Ú£¨Ä¬ÈÏ·Ö±ðÎª0XFFºÍ0X03£©£¬bufÎª×Ö½ÚÊý×é£¬lenÎª×Ö½ÚÊý×é³¤¶È
+U8* makeFrameHead(U8* buf, int ctr, int addr, int len)//²ÉÓÃÀàËÆHDLCÖ¡Í·¸ñÊ½£¬µØÖ·ºÍ¿ØÖÆ×Ö¶Î¾ùÎª1¸ö×Ö½Ú£¨Ä¬ÈÏ·Ö±ðÎª0XFFºÍ0X03£©£¬bufÎª×Ö½ÚÊý×é£¬lenÎª×Ö½ÚÊý×é³¤¶È
 {													  //ctr-----0x03±íÊ¾ÎªÊý¾ÝÖ¡ 0x01±íÊ¾ÎªackÖ¡ 0x02±íÊ¾ÎªsynÖ¡ 0x00ÎªfinÖ¡
 	U8* new_buf = (U8*)malloc(sizeof(U8) * (len + 2));
 	new_buf[0] = addr;
 	new_buf[1] = ctr;
 	if(len>0)
-	for (int i = 0; i < len + 2; i++)
+	for (int i = 0; i < len ; i++)
 		new_buf[2 + i] = buf[i];
-	free(buf);//ÊÍ·ÅÔ­À´buf
-	buf = new_buf;
-	return len + 2;
+	//free(buf);//ÊÍ·ÅÔ­À´buf
+	
+	return new_buf;
 }
 int removeFrameHeadAndFCS(U8* buf,int len)//´«ÈëÖ¡´øÍ·µÄ×Ö½ÚÊý×éÈ¥Í·ºÍCRC16Ð£ÑéÂë£¬·µ»ØÈ¥Í·ºóºÍFCSµÄ³¤¶È
 {
@@ -52,137 +55,43 @@ int removeFrameHeadAndFCS(U8* buf,int len)//´«ÈëÖ¡´øÍ·µÄ×Ö½ÚÊý×éÈ¥Í·ºÍCRC16Ð£ÑéÂ
 	return len - 4;
 }
 
-U8* creatCrc(unsigned long src, unsigned long check)//½«×Ö½ÚÊý×é»òÕßbitÊý×é×ª»¯Îªunsigned longÀàÐÍ ÓÃunsigned long decode(U8 A[], int length);  //½â±à±ÈÌØÊý×é
+unsigned short int GICREN_CalcCRC16(unsigned char* data, unsigned char len)
 {
-	unsigned long src1 = src;
-	unsigned long check1 = check;
-	int src_blen = 0;
-	int check_blen = 0;
-	unsigned long dividend = 0;
-	unsigned long divisor = 0;
-	unsigned long flag = 1;//ÅÐ¶Ï±»³ýÊý×î¸ßÎ»ÊÇ·ñÎª1
-	int flag_init_blen = 0;
-	int temp = 0;//ÓÃÓÚ´æ×î³õµÄ±»³ýÊý
-	U8* fcs;
-	for (src_blen; src1 > 0; src_blen++)
+	unsigned char i;
+	unsigned short int Init = 0xffff;  			//1111111111111111B£¬¼´CRC³õÖµ
+	while (len--)
 	{
-		src1 >>= 1;
-	}
-	for (check_blen; check1 > 0; check_blen++)
-	{
-		check1 >>= 1;
-	}
-	src1 = src;
-	check1 = check;
-	//¹¹Ôì±»³ýÊý£¨Ìî³ä±Ècheck_blenÉÙ1µÄ0£©
-	for (int i = check_blen; i > 1; i--)
-	{
-		src1 <<= 1;
-	}
-	dividend = src1;
-	src1 = src;
-
-	//¹¹Ôì³ýÊý£¨Óë±»³ýÊýµÈ³¤£©
-	for (int i = src_blen; i > 1; i--)
-	{
-		check1 <<= 1;
-	}
-	divisor = check1;
-	check1 = check;
-
-
-	temp = dividend;
-	flag_init_blen = src_blen + check_blen - 1;
-	for (int i = 1; i < flag_init_blen; i++)
-	{
-		flag <<= 1;
-	}
-	for (int i = src_blen; i > 0; i--)
-	{
-		if (flag == (flag & dividend))
+		Init ^= ((unsigned short int)(*(data++))) << 8;	//Ô´Êý¾ÝÁ÷ºóÏÈ²¹8¸ö0£¬ÏÂ·½µÄÑ­»·Óï¾äµÈÐ§ÓÚÔ´Êý¾ÝÁ÷ÓëCRC³õÖµºóÒ»Í¬²¹8¸ö0
+		for (i = 0; i < 8; i++)
 		{
-
-			dividend ^= divisor;
+			if (Init & 0x8000)
+				Init = (Init << 1) ^ 0x8005;		//1000000000000101B£¬¼´CRCÉú³É¶àÏîÊ½ÏµÊýµÄ¼òÊ½
+			else
+				Init <<= 1;
 		}
-		flag >>= 1;
-		divisor >>= 1;
 	}
-	//src_fcs = (U8*)malloc(sizeof(U8) * flag_init_blen);
-	//code(dividend + temp, src_fcs, flag_init_blen);
-	/*printf("src_fcs£º");
-	for (int i = 0; i < flag_init_blen; i++)
-	{
+	return Init;                        		//CRCÖÕÖµ
+}
 
-		printf("%d ", src_fcs[i]);
-	}*/
-	fcs = (U8*)malloc(sizeof(U8) * flag_init_blen);
-	code(dividend, fcs, check_blen - 1);
+U8* creatCrc(U8* src, unsigned char len)//´«×Ö½ÚÊý×éºÍ´óÐ¡
+{
+	unsigned short int fcs_short = 0;
+	unsigned short int flag = 0x01;
+	fcs_short = GICREN_CalcCRC16((unsigned char*)src, len);
+	U8* fcs = (U8*)malloc(sizeof(U8) * 16);
 	printf("fcs£º");
-	for (int i = 0; i < check_blen - 1; i++)
+	for (int i = 15; i >=0; i--)
 	{
-
-		printf("%d ", fcs[i]);
+		fcs[i] = fcs_short & flag;
+		fcs_short >>= 1;
 	}
 	return fcs;
 }
 
-bool checkCrc(unsigned long src_fcs, unsigned long check)//Ð£ÑéÕýÈ··µ»Øtrue£¬//½«×Ö½ÚÊý×é»òÕßbitÊý×é×ª»¯Îªunsigned longÀàÐÍ ÓÃunsigned long decode(U8 A[], int length);  //½â±à±ÈÌØÊý×é
+bool checkCrc(U8* src_fcs, unsigned char len)//´«×Ö½ÚÊý×éºÍ´óÐ¡
 {
-	unsigned long src1 = src_fcs; //11110000 0000 0000 ....
-	unsigned long check1 = check;
-	int src_blen = 0;
-	int check_blen = 0;
-	unsigned long dividend = 0;
-	unsigned long divisor = 0;
-	unsigned long flag = 1;//ÅÐ¶Ï±»³ýÊý×î¸ßÎ»ÊÇ·ñÎª1
-	int flag_init_blen = 0;
-	int temp = 0;//ÓÃÓÚ´æ×î³õµÄ±»³ýÊý
-
-	for (src_blen; src1 > 0; src_blen++)
-	{
-		src1 >>= 1;
-	}
-	for (check_blen; check1 > 0; check_blen++)
-	{
-		check1 >>= 1;
-	}
-	src1 = src_fcs;
-	check1 = check;
-	//¹¹Ôì±»³ýÊý£¨Ìî³ä±Ècheck_blenÉÙ1µÄ0£©
-	for (int i = check_blen; i > 1; i--)
-	{
-		src1 <<= 1;
-	}
-	dividend = src1;
-	src1 = src_fcs;
-
-	//¹¹Ôì³ýÊý£¨Óë±»³ýÊýµÈ³¤£©
-	for (int i = src_blen; i > 1; i--)
-	{
-		check1 <<= 1;
-	}
-	divisor = check1;
-	check1 = check;
-
-
-	temp = dividend;
-	flag_init_blen = src_blen + check_blen - 1;
-	for (int i = 1; i < flag_init_blen; i++)
-	{
-		flag <<= 1;
-	}
-	for (int i = src_blen; i > 0; i--)
-	{
-		if (flag == (flag & dividend))
-		{
-
-			dividend ^= divisor;
-		}
-		flag >>= 1;
-		divisor >>= 1;
-	}
-	//printf("\ncheck:%d\n", !dividend);
-	return !dividend;
+	
+	return !GICREN_CalcCRC16((unsigned char*)src_fcs, len);
 }
 
 
@@ -253,26 +162,32 @@ void RecvfromUpper(U8* buf, int len)
 	U8* fcs = NULL;
 	U8* new_bit_buf = NULL;
 	U8* new_buf = NULL;
+	U8* new_buf_head = NULL;
+	
 	//ÊÇ¸ß²ãÊý¾Ý£¬Ö»´Ó½Ó¿Ú0·¢³öÈ¥,¸ß²ã½Ó¿ÚÄ¬ÈÏ¶¼ÊÇ×Ö½ÚÁ÷Êý¾Ý¸ñÊ½
 	if (lowerMode[0] == 0) {
 		int return_data_len = 0;
-		len = makeFrameHead(buf,0x03,0xff,len);
-		U8* bit_buf = (U8*)malloc(sizeof(len * 8));
+		new_buf_head = makeFrameHead(buf,0x03,0xff,len);
+		len = len + 2;//¶àÁËÍ·²¿2×Ö½Ú
+		U8* bit_buf  = (U8*)malloc(sizeof(U8)*(len * 8));
 
-		ByteArrayToBitArray(bit_buf, len * 8,buf,len);
-		fcs=creatCrc(decode(bit_buf, len * 8), 98309);
-		
+		ByteArrayToBitArray(bit_buf, len * 8, new_buf_head,len);
+		fcs=creatCrc(new_buf_head, len);
+		free(new_buf_head);
 		//newbuf=(U8*)malloc(sizeof(U8)*len*8+15)
 		new_bit_buf = (U8*)malloc(sizeof(U8) * (len * 8 + 16));
 		for (int i = 0; i < len * 8; i++)
 			new_bit_buf[i] = bit_buf[i];
+		//free(bit_buf);
 		for (int i = 0; i < 16; i++)//ÒòÎª²ÉÓÃµÄÊÇCRC16
 			new_bit_buf[len * 8 + i] = fcs[i];
-		U8* new_buf = (U8*)malloc(sizeof(len+2));
+		new_buf = (U8*)malloc(sizeof(U8)* (len + 2));
 		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
 
-
+		free(fcs);
+		free(new_bit_buf);
 		bufSend = MakeFrame(new_buf, len+2, &return_data_len);
+		free(new_buf);
 		iSndRetval = SendtoLower(bufSend, return_data_len,0); //²ÎÊýÒÀ´ÎÎªÊý¾Ý»º³å£¬³¤¶È£¬½Ó¿ÚºÅ>>>>>>>>·¢>>>>>>>>>>>>
 	}
 	else {
@@ -317,6 +232,12 @@ void RecvfromUpper(U8* buf, int len)
 		break;
 	}
 
+	
+	
+
+	
+	
+	
 }
 //***************ÖØÒªº¯ÊýÌáÐÑ******************************
 //Ãû³Æ£ºRecvfromLower
@@ -597,6 +518,7 @@ U8* MakeFrame(U8* byte_data,int len, int* return_data_len)
 	//U8 testArray[90] = {0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0};
 	//U8* reArray = (U8*)malloc(200*sizeof(char));
 	//int a = BitArrayToByteArray(testArray, 26, reArray, 200);
+	free(bitArray);
 	return sendBitArray;
 }
 
