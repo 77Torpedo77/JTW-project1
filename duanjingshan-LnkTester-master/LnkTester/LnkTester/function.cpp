@@ -77,7 +77,6 @@ U8* creatCrc(U8* src, unsigned char len)//传字节数组和大小
 	unsigned short int flag = 0x01;
 	fcs_short = GICREN_CalcCRC16((unsigned char*)src, len);
 	U8* fcs = (U8*)malloc(sizeof(U8) * 16);
-	printf("fcs：");
 	for (int i = 15; i >=0; i--)
 	{
 		fcs[i] = fcs_short & flag;
@@ -161,16 +160,16 @@ void RecvfromUpper(U8* buf, int len)
 	U8* new_bit_buf = NULL;
 	U8* new_buf = NULL;
 	U8* new_buf_head = NULL;
-	
+
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
 		int return_data_len = 0;
-		new_buf_head = makeFrameHead(buf,0x03,0xff,len);
+		new_buf_head = makeFrameHead(buf, 0x03, 0xff, len);
 		len = len + 2;//多了头部2字节
-		U8* bit_buf  = (U8*)malloc(sizeof(U8)*(len * 8));
+		U8* bit_buf = (U8*)malloc(sizeof(U8) * (len * 8));
 
-		ByteArrayToBitArray(bit_buf, len * 8, new_buf_head,len);
-		fcs=creatCrc(new_buf_head, len);
+		ByteArrayToBitArray(bit_buf, len * 8, new_buf_head, len);
+		fcs = creatCrc(new_buf_head, len);
 		free(new_buf_head);
 		//newbuf=(U8*)malloc(sizeof(U8)*len*8+15)
 		new_bit_buf = (U8*)malloc(sizeof(U8) * (len * 8 + 16));
@@ -179,14 +178,15 @@ void RecvfromUpper(U8* buf, int len)
 		//free(bit_buf);
 		for (int i = 0; i < 16; i++)//因为采用的是CRC16
 			new_bit_buf[len * 8 + i] = fcs[i];
-		new_buf = (U8*)malloc(sizeof(U8)* (len + 2));
-		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 3);
+		new_buf = (U8*)malloc(sizeof(U8) * (len + 2));
 
+		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
+		bufSend = MakeFrame(new_buf, len + 2, &return_data_len);
+		iSndRetval = SendtoLower(bufSend, return_data_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+		free(new_buf);
 		free(fcs);
 		free(new_bit_buf);
-		bufSend = MakeFrame(new_buf, len+2, &return_data_len);
-		free(new_buf);
-		iSndRetval = SendtoLower(bufSend, return_data_len,0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+
 	}
 	else {
 		//下层是字节数组接口，可直接发送
@@ -230,13 +230,14 @@ void RecvfromUpper(U8* buf, int len)
 		break;
 	}
 
-	
-	
 
-	
-	
-	
+
+
+
+
+
 }
+
 //***************重要函数提醒******************************
 //名称：RecvfromLower
 //功能：本函数被调用时，意味着得到一份从低层实体递交上来的数据
