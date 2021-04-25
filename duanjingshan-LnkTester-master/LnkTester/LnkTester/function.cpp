@@ -331,7 +331,7 @@ void RecvfromUpper(U8* buf, int len)
 //输出：
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
-	int iSndRetval;
+	int iSndRetval = 0;
 	U8* bufSend = NULL;
 	if (ifNo == 0 && lowerNumber > 1) {
 		//从接口0收到的数据，直接转发到接口1 —— 仅仅用于测试
@@ -616,7 +616,7 @@ U8* getFrame(U8* bit_data , int* len)
 		{
 			get_head = 1;
 			head = i + 8;
-			i += 8;
+			i += 7;
 		}
 
 		if (bit_data[i] == 0 &&
@@ -626,7 +626,7 @@ U8* getFrame(U8* bit_data , int* len)
 			bit_data[i + 4] == 1 &&
 			bit_data[i + 5] == 1 &&
 			bit_data[i + 6] == 1 &&
-			bit_data[i + 7] == 0 && get_head == 0 && get_tail == 0)
+			bit_data[i + 7] == 0 && get_head == 1 && get_tail == 0)
 		{
 			get_tail = 1;
 			tail = i - 1;
@@ -652,6 +652,6 @@ U8* getFrame(U8* bit_data , int* len)
 			count = 0;
 		}
 	}
-	*len = j - 1;
+	*len = j;
 	return return_bit_data;
 }

@@ -323,6 +323,7 @@ unsigned long decode(U8 A[], int length)
 	int i;
 
 	x = 0;
+	length = 33;
 	for (i = 0; i < length; i++) {
 		if (A[i] == 0) {
 			x = x << 1;;
