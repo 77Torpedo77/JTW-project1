@@ -26,6 +26,7 @@ int iRcvUnknownCount = 0;  //收到不明来源数据总次数
 void print_statistics();
 void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
+U8* getFrame(U8* bit_data, int* len);
 
 int makeFrameHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地址和控制字段均为1个字节（默认分别为0XFF和0X03），buf为字节数组，len为字节数组长度
 {													  //ctr-----0x03表示为数据帧 0x01表示为ack帧 0x02表示为syn帧 0x00为fin帧

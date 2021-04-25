@@ -393,7 +393,7 @@ int main(int argc, char* argv[])
 		////s2 = "NET";
 		//cout << "请输入实体号：";
 		//cin >> s3;
-		s1 = '1';
+		s1 = '2';
 		s2 = "LNK";
 		s3 = '0';
 	}
