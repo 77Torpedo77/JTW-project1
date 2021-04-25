@@ -147,10 +147,10 @@ void TimeOut()
 	if (start_timeout == 1)
 	{
 		time_count++;
-		if (time_count == 100)//5000ms
+		if (time_count >= 100)//5000ms
 		{
 			SendtoLower(resent_buf, resent_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
-
+			time_count = 0;
 		}
 	}
 	print_statistics();
