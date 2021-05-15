@@ -32,7 +32,7 @@ int resent_len = 0;//重传长度记录
 U8 ack_array[57] = { 0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0 };//ack帧
 #define max_device_num 100//最大设备数
 int mac_port_table[max_device_num][3];//第一行第一列第二例是对应的mac值（我们定义的mac值由网元编号加PHY层实体号组成），第三列为进入交换机的端口号（即PHY层实体号）
-
+int global_ifNo = -1;
 
 //打印统计信息
 void print_statistics();
@@ -196,7 +196,7 @@ void TimeOut()
 		time_count++;
 		if (time_count >= 100)//5000ms
 		{
-			SendtoLower(resent_buf, resent_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+			SendtoLower(resent_buf, resent_len, global_ifNo); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
 			time_count = 0;
 		}
 	}
@@ -317,6 +317,7 @@ void RecvfromUpper(U8* buf, int len)
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
 	int iSndRetval = 0;
+	global_ifNo = ifNo;
 	//非接口0的数据，或者低层只有1个接口的数据，都向上递交
 	if (lowerMode[ifNo] == 0) {
 		//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交

@@ -30,7 +30,6 @@ int start_timeout = 0;//开始超时重传检测标志位
 U8* resent_buf = NULL;//重传指针记录
 int resent_len = 0;//重传长度记录
 U8 ack_array[57] = { 0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0 };//ack帧
-int global_ifNo = -1;
 
 extern int s_mac1;	//全局变量声明 
 extern int s_mac2;
@@ -194,7 +193,7 @@ void TimeOut()
 		time_count++;
 		if (time_count >= 100)//5000ms
 		{
-			SendtoLower(resent_buf, resent_len,global_ifNo); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+			SendtoLower(resent_buf, resent_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
 			time_count = 0;
 		}
 	}
@@ -318,7 +317,6 @@ void RecvfromUpper(U8* buf, int len)
 //输出：
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
-	global_ifNo = ifNo;
 	int iSndRetval = 0;
 	U8* bufSend = NULL;
 	if (ifNo == 0 && lowerNumber > 1) {
