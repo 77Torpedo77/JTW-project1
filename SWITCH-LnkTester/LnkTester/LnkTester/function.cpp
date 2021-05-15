@@ -317,141 +317,81 @@ void RecvfromUpper(U8* buf, int len)
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
 	int iSndRetval = 0;
-	U8* bufSend = NULL;
-	if (ifNo == 0 && lowerNumber > 1) {
-		//从接口0收到的数据，直接转发到接口1 —— 仅仅用于测试
-		if (lowerMode[0] == lowerMode[1]) {
-			//接口0和1的数据格式相同，直接转发
-			iSndRetval = SendtoLower(buf, len, 1);
-			if (lowerMode[0] == 1) {
-				iSndRetval = iSndRetval * 8;//如果接口格式为bit数组，统一换算成位，完成统计
+	//非接口0的数据，或者低层只有1个接口的数据，都向上递交
+	if (lowerMode[ifNo] == 0) {
+		//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交
+		U8* true_data = (U8*)malloc(sizeof(U8) * (len / 8 + 1));//true_data:去掉定位符的数据,bit数组
+		int true_data_len = 0;
+		true_data = getFrame(buf, &true_data_len);
+		//copy一遍，校验正确直接发这个
+		//U8* true_data_copy = (U8*)malloc(sizeof(U8) * (len / 8 + 1));
+		//for (int i = 0; i < true_data_len; i++)
+		//{
+		//	true_data_copy[i] = true_data[i];
+		//}
+		//U8* true_data_copy_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
+		//BitArrayToByteArray(true_data, true_data_len, true_data_copy_byte, true_data_len / 8);
+		int send_bit_data_copy_len = -1;
+		U8* send_bit_data_copy = NULL;
+		//send_bit_data_copy = MakeFrame(true_data_copy_byte, true_data_len / 8, &send_bit_data_copy_len);
+		//free(true_data_copy_byte);
+		U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
+		BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
+		send_bit_data_copy = MakeFrame(true_data_byte, true_data_len / 8, &send_bit_data_copy_len);
+
+		//交换机逻辑初始化，在case里初始化报错
+		U8* geted_data_byte = NULL;
+		U8* geted_data_bit = (U8*)malloc((true_data_len / 8 - 4 )* 8);//true_data_len / 8 - 4 就是下面的iSndRetval，需要初始化所以搬上来了
+		int src1 = -1, src2 = -1, dst1 = -1, dst2 = -1, frame_type = -1;
+		int tran_port = -1;
+
+		if (checkCrc(true_data_byte, true_data_len/8))
+		{
+			switch (true_data_byte[1]) {
+				case 0x03:
+					SendtoLower(ack_array, 57, ifNo);
+					true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
+					iSndRetval = true_data_len / 8 - 4;
+					//如果是数据帧，往上交
+					//iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
+					//iSndRetval = iSndRetval * 8;//换算成位,进行统计
+					//发送ACK确认
+
+					//以下是交换机逻辑
+					geted_data_byte = getSrcDstAndTypeFromHead(true_data_byte, &src1, &src2, &dst1, &dst2, &frame_type, iSndRetval);
+					tran_port = useMacPortTable(src1, src2, ifNo, dst1, dst2);//学习
+
+					ByteArrayToBitArray(geted_data_bit, iSndRetval * 8, geted_data_byte, iSndRetval);
+					if (tran_port == -1)
+					{
+						broadcast(send_bit_data_copy, send_bit_data_copy_len, ifNo);
+					}
+					else
+					{
+						SendtoLower(send_bit_data_copy, send_bit_data_copy_len, ifNo);
+					}
+					iSndRetval = send_bit_data_copy_len;//换算成位,进行统计
+					//SendtoLower(ack_array, 57 , ifNo);
+					break;
+				case 0x01:
+					//如果是确认帧，取消超时重传
+					start_timeout = 0;
+					break;
 			}
 		}
-		else {
-			//接口0与接口1的数据格式不同，需要转换后，再发送
-			if (lowerMode[0] == 1) {
-				//从接口0到接口1，接口0是字节数组，接口1是比特数组，需要扩大8倍转换
-				bufSend = (U8*)malloc(len * 8);
-				if (bufSend == NULL) {
-					cout << "内存空间不够，导致数据没有被处理" << endl;
-					return;
-				}
-				//byte to bit
-				iSndRetval = ByteArrayToBitArray(bufSend, len * 8, buf, len);
-				iSndRetval = SendtoLower(bufSend, iSndRetval, 1);
-			}
-			else {
-				//从接口0到接口1，接口0是比特数组，接口1是字节数组，需要缩小八分之一转换
-				bufSend = (U8*)malloc(len / 8 + 1);
-				if (bufSend == NULL) {
-					cout << "内存空间不够，导致数据没有被处理" << endl;
-					return;
-				}
-				//bit to byte
-				iSndRetval = BitArrayToByteArray(buf, len, bufSend, len / 8 + 1);
-				iSndRetval = SendtoLower(bufSend, iSndRetval, 1);
-
-				iSndRetval = iSndRetval * 8;//换算成位，做统计
-
-			}
-		}
-		//统计
-		if (iSndRetval <= 0) {
-			iSndErrorCount++;
-		}
-		else {
-			iRcvForward += iSndRetval;
-			iRcvForwardCount++;
-		}
-	}
-	else {
-		//非接口0的数据，或者低层只有1个接口的数据，都向上递交
-		if (lowerMode[ifNo] == 0) {
-			//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交
-			bufSend = (U8*)malloc(len / 8 + 1);
-			if (bufSend == NULL) {
-				cout << "内存空间不够，导致数据没有被处理" << endl;
-				return;
-			}
-			U8* true_data = (U8*)malloc(sizeof(U8) * (len / 8 + 1));//true_data:去掉定位符的数据,bit数组
-			int true_data_len = 0;
-			true_data = getFrame(buf, &true_data_len);
-			U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
-			BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
-
-			//交换机逻辑初始化，在case里初始化报错
-			U8* geted_data_byte = NULL;
-			U8* geted_data_bit = (U8*)malloc((true_data_len / 8 - 4 )* 8);//true_data_len / 8 - 4 就是下面的iSndRetval，需要初始化所以搬上来了
-			int src1 = -1, src2 = -1, dst1 = -1, dst2 = -1, frame_type = -1;
-			int tran_port = -1;
-
-			if (checkCrc(true_data_byte, true_data_len/8))
-			{
-				switch (true_data_byte[1]) {
-					case 0x03:
-						true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
-						iSndRetval = true_data_len / 8 - 4;
-						//如果是数据帧，往上交
-						//iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
-						//iSndRetval = iSndRetval * 8;//换算成位,进行统计
-						//发送ACK确认
-
-						//以下是交换机逻辑
-						geted_data_byte = getSrcDstAndTypeFromHead(true_data_byte, &src1, &src2, &dst1, &dst2, &frame_type, iSndRetval);
-						tran_port = useMacPortTable(src1, src2, ifNo, dst1, dst2);//学习
-						ByteArrayToBitArray(geted_data_bit, iSndRetval * 8, geted_data_byte, iSndRetval);
-						if (tran_port == -1)
-						{
-							broadcast(geted_data_bit, iSndRetval * 8, ifNo);
-						}
-						else
-						{
-							SendtoLower(geted_data_bit, iSndRetval * 8, ifNo);
-						}
-						iSndRetval = iSndRetval * 8;//换算成位,进行统计
-						SendtoLower(ack_array, 57 , ifNo);
-						break;
-					case 0x01:
-						//如果是确认帧，取消超时重传
-						start_timeout = 0;
-						break;
-				}
-			}
-			else //校验出错误
-			{
+		else //校验出错误
+		{
 				//不发ACK，什么都不干
-			}
-			
-			
-
-		}
-		else {
-			//低层是字节数组接口，可直接递交
-			iSndRetval = SendtoUpper(buf, len);
-			iSndRetval = iSndRetval * 8;//换算成位，进行统计
-		}
-		//统计
-		if (iSndRetval <= 0) {
-			iSndErrorCount++;
-		}
-		else {
-			iRcvToUpper += iSndRetval;
-			iRcvToUpperCount++;
 		}
 	}
-	//如果需要重传等机制，可能需要将buf或bufSend中的数据另外申请空间缓存起来
-	if (bufSend != NULL) {
-		//缓存bufSend数据，如果有必要的话
-
-		//本例程中没有停等协议，bufSend的空间在用完以后需要释放
-		free(bufSend);
+		//统计
+	if (iSndRetval <= 0) {
+		iSndErrorCount++;
 	}
 	else {
-		//缓存buf里的数据，如果有必要的话
-
-		//buf空间不需要释放
+		iRcvToUpper += iSndRetval;
+		iRcvToUpperCount++;
 	}
-
 	//打印
 	switch (iWorkMode % 10) {
 	case 1:
@@ -700,4 +640,35 @@ U8* getSrcDstAndTypeFromHead(U8* byte_data, int* src1, int* src2, int* dst1, int
 		return_byte_data[i] = byte_data[i + 4];
 	}
 	return return_byte_data;
+}
+
+U8* encapsulation(U8* byte_data ,int len , int* return_data_len)
+{
+	U8* fcs = NULL;
+	U8* new_bit_buf = NULL;
+	U8* new_buf = NULL;
+	U8* bufSend = NULL;
+	U8* new_buf_head = (U8*)malloc(len+2);
+	new_buf_head = makeFrameHead(byte_data, 0x03, 0xff, len);
+	len = len + 2;//多了头部2字节
+
+	U8* bit_buf = (U8*)malloc(sizeof(U8) * (len * 8));
+	ByteArrayToBitArray(bit_buf, len * 8, new_buf_head, len);
+	fcs = creatCrc(new_buf_head, len);
+	free(new_buf_head);
+	//newbuf=(U8*)malloc(sizeof(U8)*len*8+15)
+	new_bit_buf = (U8*)malloc(sizeof(U8) * (len * 8 + 16));
+	for (int i = 0; i < len * 8; i++)
+		new_bit_buf[i] = bit_buf[i];
+	//free(bit_buf);
+	for (int i = 0; i < 16; i++)//因为采用的是CRC16
+		new_bit_buf[len * 8 + i] = fcs[i];
+	new_buf = (U8*)malloc(sizeof(U8) * (len + 2));
+
+	BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
+	bufSend = MakeFrame(new_buf, len + 2, return_data_len);
+	free(new_buf);
+	free(fcs);
+	free(new_bit_buf);
+	return bufSend;
 }

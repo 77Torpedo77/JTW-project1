@@ -150,6 +150,7 @@
     <ClCompile Include="CfgFileParms.cpp" />
     <ClCompile Include="function.cpp" />
     <ClCompile Include="LnkTester.cpp" />
+    <ClCompile Include="SWITCH.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CfgFileParms.h" />
