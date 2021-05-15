@@ -369,7 +369,7 @@ int main(int argc, char* argv[])
 	fd_set readfds;
 	timeval timeout;
 	unsigned long arg;
-	string s1, s2, s3;
+	string s1, s2, s3,s4;
 	int i;
 	string strTmp;
 
@@ -397,19 +397,24 @@ int main(int argc, char* argv[])
 		//cout << "请输入层次名（大写）：";
 		//cin >> s2;
 		//s2 = "NET";
-		cout << "请输入实体号：";
-		cin >> s3;
+		//cout << "请输入实体号：";
+		//cin >> s3;
 		//s1 = '2';
 		s2 = "LNK";
-		//s3 = '0';
-		s_mac1 = atoi(s1.c_str());	 
-		s_mac2 = atoi(s3.c_str());
+		s3 = '0';
+		s_mac1 = atoi(s1.c_str());	
+
+		cout << "请输入自己的物理层实体号：";
+		cin >> s4;
+		s_mac2 = atoi(s4.c_str());
+
 		cout << "请输入目标设备号：";
-		cin >> s1;
-		cout << "请输入目标实体号：";
-		cin >> s3;
-		t_mac1 = atoi(s1.c_str());
-		t_mac2 = atoi(s3.c_str());
+		cin >> s4;
+		t_mac1 = atoi(s4.c_str());
+
+		cout << "请输入目标物理层实体号：";
+		cin >> s4;
+		t_mac2 = atoi(s4.c_str());
 		
 	}
 	WSAStartup(0x101, &wsa);
