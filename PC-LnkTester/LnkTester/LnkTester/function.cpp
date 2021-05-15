@@ -30,6 +30,11 @@ int start_timeout = 0;//开始超时重传检测标志位
 U8* resent_buf = NULL;//重传指针记录
 int resent_len = 0;//重传长度记录
 U8 ack_array[57] = { 0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0 };//ack帧
+extern int s_mac1;	//全局变量声明 
+extern int s_mac2;
+extern int t_mac1;	
+extern int t_mac2;
+extern int s_port;
 
 
 //打印统计信息
@@ -37,6 +42,44 @@ void print_statistics();
 void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
 U8* getFrame(U8* bit_data, int* len);
+
+U8* getSrcDstAndTypeFromHead(U8* byte_data, int* src1, int* src2, int* dst1, int* dst2, int* frame_type, int len)
+{
+	//U8* byte_data = (U8*)malloc((len / 8) + 1);
+	int src, dst;
+	//BitArrayToByteArray(bit_data, len, byte_data, (len / 8) + 1);
+	src = (int)byte_data[0];
+	*src1 = src / 2 / 2 / 2 / 2;
+	*src2 = src - *src1 * 2 * 2 * 2 * 2;
+	dst = (int)byte_data[1];
+	*dst1 = dst / 2 / 2 / 2 / 2;
+	*dst2 = dst - *dst1 * 2 * 2 * 2 * 2;
+	*frame_type = (int)byte_data[2];
+	//free(byte_data);
+
+	U8* return_byte_data = (U8*)malloc(len - 4);
+	for (int i = 0; i < len - 4; i++)
+	{
+		return_byte_data[i] = byte_data[i + 4];
+	}
+	return return_byte_data;
+}
+
+
+//frame_type:1==数据帧，2==ping帧，3==确认帧
+U8* addSrcDstAndTypeToHead(U8* byte_data, int src1, int src2, int dst1, int dst2, int frame_type, int len)
+{
+	U8* new_byte_data = (U8*)malloc(sizeof(U8) * (len + 4));
+	new_byte_data[0] = (char)(src1 * 2 * 2 * 2 * 2 + src2);
+	new_byte_data[1] = (char)(dst1 * 2 * 2 * 2 * 2 + dst2); //左移四位再拼凑低四位
+	new_byte_data[2] = (char)frame_type;
+	if (len > 0)
+		for (int i = 0; i < len; i++)
+			new_byte_data[4 + i] = byte_data[i];
+
+	return new_byte_data;
+}
+
 
 U8* makeFrameHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地址和控制字段均为1个字节（默认分别为0XFF和0X03），buf为字节数组，len为字节数组长度
 {													  //ctr-----0x03表示为数据帧 0x01表示为ack帧 0x02表示为syn帧 0x00为fin帧
@@ -178,7 +221,11 @@ void RecvfromUpper(U8* buf, int len)
 	int return_data_len = 0;
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
-		new_buf_head = makeFrameHead(buf, 0x03, 0xff, len);
+		//加一个计时器，如果一段时间没收到lower的确认直接timeout
+		U8* buf_mac = addSrcDstAndTypeToHead(buf, s_mac1, s_mac2, t_mac1, t_mac2, 1, len);
+			len = len + 4;
+		new_buf_head = makeFrameHead(buf_mac, 0x03, 0xff, len);
+
 		len = len + 2;//多了头部2字节
 		U8* bit_buf = (U8*)malloc(sizeof(U8) * (len * 8));
 
@@ -330,6 +377,10 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 			int true_data_len = 0;
 			true_data = getFrame(buf, &true_data_len);
 			U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
+			int dst1 = -1;
+			int dst2 = -1;
+			int frame_type = -1;
+			U8* upper_byte;
 			BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
 			if (checkCrc(true_data_byte, true_data_len/8))
 			{
@@ -337,7 +388,24 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 					case 0x03:
 						true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
 						iSndRetval = true_data_len / 8 - 4;
-						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
+						
+						//解mac包
+						upper_byte=getSrcDstAndTypeFromHead(true_data_byte, NULL, NULL, &dst1, &dst2, &frame_type, iSndRetval);
+						if (s_mac1==dst1&&s_mac2==dst2)//判断是否是找我们的包,不是不做回应
+						{
+							switch (frame_type)
+							{
+							case 1:
+								iSndRetval = SendtoUpper(upper_byte, iSndRetval - 4);
+								break;
+							case 3:
+								//取消计时、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、
+								break;
+							default:
+								break;
+							}
+						}
+						
 						iSndRetval = iSndRetval * 8;//换算成位,进行统计
 						//发送ACK确认
 						SendtoLower(ack_array, 57 , 0);

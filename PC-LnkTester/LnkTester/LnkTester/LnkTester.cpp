@@ -9,6 +9,12 @@
 #include "function.h"
 #pragma comment (lib,"wsock32.lib")
 
+int s_mac1;	//全局变量声明 
+int s_mac2;
+int t_mac1;
+int t_mac2;
+int s_port;
+
 
 //============重点来了================================================================================================
 //------------重要的控制参数------------------------------------------------------------
@@ -386,16 +392,25 @@ int main(int argc, char* argv[])
 	}
 	else {
 		//从键盘读取
-		//cout << "请输入设备号：";
-		//cin >> s1;
+		cout << "请输入设备号：";
+		cin >> s1;
 		//cout << "请输入层次名（大写）：";
 		//cin >> s2;
-		////s2 = "NET";
-		//cout << "请输入实体号：";
-		//cin >> s3;
-		s1 = '2';
+		//s2 = "NET";
+		cout << "请输入实体号：";
+		cin >> s3;
+		//s1 = '2';
 		s2 = "LNK";
-		s3 = '0';
+		//s3 = '0';
+		s_mac1 = atoi(s1.c_str());	 
+		s_mac2 = atoi(s3.c_str());
+		cout << "请输入目标设备号：";
+		cin >> s1;
+		cout << "请输入目标实体号：";
+		cin >> s3;
+		t_mac1 = atoi(s1.c_str());
+		t_mac2 = atoi(s3.c_str());
+		
 	}
 	WSAStartup(0x101, &wsa);
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
