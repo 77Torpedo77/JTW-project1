@@ -30,6 +30,7 @@ int start_timeout = 0;//开始超时重传检测标志位
 U8* resent_buf = NULL;//重传指针记录
 int resent_len = 0;//重传长度记录
 U8 ack_array[57] = { 0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0 };//ack帧
+
 extern int s_mac1;	//全局变量声明 
 extern int s_mac2;
 extern int t_mac1;	
@@ -379,8 +380,17 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 			U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
 			int dst1 = -1;
 			int dst2 = -1;
+			int src1 = -1;
+			int src2 = -1;
 			int frame_type = -1;
 			U8* upper_byte;
+			U8* ack_ping_temp = NULL;
+			U8* ack_ping_final = NULL;
+			U8* ack_ping_temp_bit = NULL;
+			U8* ack_ping_temp_bit_fcs = NULL;
+			U8* ack_ping_final_bufSend = NULL;
+			int return_data_len = 0;
+			U8 ack_ping[1] = { 0 };
 			BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
 			if (checkCrc(true_data_byte, true_data_len/8))
 			{
@@ -390,15 +400,35 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 						iSndRetval = true_data_len / 8 - 4;
 						
 						//解mac包
-						upper_byte=getSrcDstAndTypeFromHead(true_data_byte, NULL, NULL, &dst1, &dst2, &frame_type, iSndRetval);
+						upper_byte=getSrcDstAndTypeFromHead(true_data_byte, &src1, &src2, &dst1, &dst2, &frame_type, iSndRetval);
 						if (s_mac1==dst1&&s_mac2==dst2)//判断是否是找我们的包,不是不做回应
 						{
 							switch (frame_type)
 							{
 							case 1:
 								iSndRetval = SendtoUpper(upper_byte, iSndRetval - 4);
+								//构造mac确认帧并发送
+								ack_ping_temp=addSrcDstAndTypeToHead(ack_ping, dst1, dst2, src1, src2, 3, 1);
+								ack_ping_temp=makeFrameHead(ack_ping_temp, 0x03, 0xff, 1+4);
+								ack_ping_temp_bit= (U8*)malloc(sizeof(U8) * ((1+4+2) * 8));
+								ByteArrayToBitArray(ack_ping_temp_bit, (1 + 4 + 2) * 8, ack_ping_temp, 1 + 4 + 2);
+								ack_ping_temp_bit_fcs = creatCrc(ack_ping_temp, 1 + 4 + 2);
+								free(ack_ping_temp);
+								ack_ping_temp= (U8*)malloc(sizeof(U8) * ((1 + 4 + 2) * 8 + 16));
+								for (int i = 0; i < (1 + 4 + 2) * 8; i++)
+									ack_ping_temp[i] = ack_ping_temp_bit[i];
+								for (int i = 0; i < 16; i++)//因为采用的是CRC16
+									ack_ping_temp[(1 + 4 + 2) * 8 + i] = ack_ping_temp_bit_fcs[i];
+								ack_ping_final= (U8*)malloc(sizeof(U8) * ((1 + 4 + 2) + 2));
+								BitArrayToByteArray(ack_ping_temp, (1 + 4 + 2) * 8 + 16, ack_ping_final, (1 + 4 + 2) + 2);
+								ack_ping_final_bufSend = MakeFrame(ack_ping_final, (1 + 4 + 2) + 2, &return_data_len);
+								SendtoLower(ack_ping_final_bufSend, return_data_len, ifNo);
+								free(ack_ping_temp);
+								free(ack_ping_temp_bit_fcs);
+								free(ack_ping_final_bufSend);
 								break;
 							case 3:
+
 								//取消计时、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、
 								break;
 							default:
