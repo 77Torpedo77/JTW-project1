@@ -396,6 +396,8 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 			{
 				switch (true_data_byte[1]) {
 					case 0x03:
+						//发送ACK确认
+						SendtoLower(ack_array, 57, 0);
 						true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
 						iSndRetval = true_data_len / 8 - 4;
 						
@@ -437,8 +439,6 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 						}
 						
 						iSndRetval = iSndRetval * 8;//换算成位,进行统计
-						//发送ACK确认
-						SendtoLower(ack_array, 57 , 0);
 						break;
 					case 0x01:
 						//如果是确认帧，取消超时重传
