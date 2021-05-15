@@ -40,7 +40,7 @@ void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
 U8* getFrame(U8* bit_data, int* len);
 int broadcast(U8* bit_data, int len, int ifNo);
-U8* getSrcDstAndTypeFromHead(U8* bit_data, int* src1, int* src2, int* dst1, int* dst2, int frame_type, int len);
+U8* getSrcDstAndTypeFromHead(U8* bit_data, int* src1, int* src2, int* dst1, int* dst2, int* frame_type, int len);
 
 U8* makeFrameHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地址和控制字段均为1个字节（默认分别为0XFF和0X03），buf为字节数组，len为字节数组长度
 {													  //ctr-----0x03表示为数据帧 0x01表示为ack帧 0x02表示为syn帧 0x00为fin帧
@@ -378,6 +378,13 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 			true_data = getFrame(buf, &true_data_len);
 			U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
 			BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
+
+			//交换机逻辑初始化，在case里初始化报错
+			U8* geted_data_byte = NULL;
+			U8* geted_data_bit = (U8*)malloc((true_data_len / 8 - 4 )* 8);//true_data_len / 8 - 4 就是下面的iSndRetval，需要初始化所以搬上来了
+			int src1 = -1, src2 = -1, dst1 = -1, dst2 = -1, frame_type = -1;
+			int tran_port = -1;
+
 			if (checkCrc(true_data_byte, true_data_len/8))
 			{
 				switch (true_data_byte[1]) {
@@ -385,10 +392,24 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 						true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
 						iSndRetval = true_data_len / 8 - 4;
 						//如果是数据帧，往上交
-						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
-						iSndRetval = iSndRetval * 8;//换算成位,进行统计
+						//iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
+						//iSndRetval = iSndRetval * 8;//换算成位,进行统计
 						//发送ACK确认
-						SendtoLower(ack_array, 57 , 0);
+
+						//以下是交换机逻辑
+						geted_data_byte = getSrcDstAndTypeFromHead(true_data_byte, &src1, &src2, &dst1, &dst2, &frame_type, iSndRetval);
+						tran_port = useMacPortTable(src1, src2, ifNo, dst1, dst2);//学习
+						ByteArrayToBitArray(geted_data_bit, iSndRetval * 8, geted_data_byte, iSndRetval);
+						if (tran_port == -1)
+						{
+							broadcast(geted_data_bit, iSndRetval * 8, ifNo);
+						}
+						else
+						{
+							SendtoLower(geted_data_bit, iSndRetval * 8, ifNo);
+						}
+						iSndRetval = iSndRetval * 8;//换算成位,进行统计
+						SendtoLower(ack_array, 57 , ifNo);
 						break;
 					case 0x01:
 						//如果是确认帧，取消超时重传
@@ -659,24 +680,24 @@ int broadcast(U8* bit_data, int len, int ifNo)
 	return 1;
 }
 
-U8* getSrcDstAndTypeFromHead(U8* bit_data, int* src1, int* src2, int* dst1, int* dst2, int frame_type, int len)
+U8* getSrcDstAndTypeFromHead(U8* byte_data, int* src1, int* src2, int* dst1, int* dst2, int* frame_type, int len)
 {
-	U8* byte_data = (U8*)malloc((len / 8) + 1);
+	//U8* byte_data = (U8*)malloc((len / 8) + 1);
 	int src, dst;
-	BitArrayToByteArray(bit_data, len, byte_data, (len / 8) + 1);
+	//BitArrayToByteArray(bit_data, len, byte_data, (len / 8) + 1);
 	src = (int)byte_data[0];
 	*src1 = src / 2 / 2 / 2 / 2;
 	*src2 = src - *src1 * 2 * 2 * 2 * 2;
 	dst = (int)byte_data[1];
 	*dst1 = dst / 2 / 2 / 2 / 2;
 	*dst2 = dst - *dst1 * 2 * 2 * 2 * 2;
-	frame_type = (int)byte_data[2];
-	free(byte_data);
+	*frame_type = (int)byte_data[2];
+	//free(byte_data);
 
-	U8* return_bit_data = (U8*)malloc(len-4*8);
-	for (int i = 0; i < len- 4 * 8; i++)
+	U8* return_byte_data = (U8*)malloc(len-4);
+	for (int i = 0; i < len- 4; i++)
 	{
-		return_bit_data[i] = bit_data[i + 4 * 8];
+		return_byte_data[i] = byte_data[i + 4];
 	}
-	return return_bit_data;
+	return return_byte_data;
 }
