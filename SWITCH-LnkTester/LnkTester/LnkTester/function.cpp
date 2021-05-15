@@ -30,6 +30,8 @@ int start_timeout = 0;//¿ªÊ¼³¬Ê±ÖØ´«¼ì²â±êÖ¾Î»
 U8* resent_buf = NULL;//ÖØ´«Ö¸Õë¼ÇÂ¼
 int resent_len = 0;//ÖØ´«³¤¶È¼ÇÂ¼
 U8 ack_array[57] = { 0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0 };//ackÖ¡
+#define max_device_num 100//×î´óÉè±¸Êı
+int mac_port_table[max_device_num][3];//µÚÒ»ĞĞµÚÒ»ÁĞµÚ¶şÀıÊÇ¶ÔÓ¦µÄmacÖµ£¨ÎÒÃÇ¶¨ÒåµÄmacÖµÓÉÍøÔª±àºÅ¼ÓPHY²ãÊµÌåºÅ×é³É£©£¬µÚÈıÁĞÎª½øÈë½»»»»úµÄ¶Ë¿ÚºÅ£¨¼´PHY²ãÊµÌåºÅ£©
 
 
 //´òÓ¡Í³¼ÆĞÅÏ¢
@@ -37,6 +39,8 @@ void print_statistics();
 void menu();
 U8* MakeFrame(U8* byte_data, int len, int* return_data_len);
 U8* getFrame(U8* bit_data, int* len);
+int broadcast(U8* bit_data, int len, int ifNo);
+U8* getSrcDstAndTypeFromHead(U8* bit_data, int* src1, int* src2, int* dst1, int* dst2, int frame_type, int len);
 
 U8* makeFrameHead(U8* buf, int ctr, int addr, int len)//²ÉÓÃÀàËÆHDLCÖ¡Í·¸ñÊ½£¬µØÖ·ºÍ¿ØÖÆ×Ö¶Î¾ùÎª1¸ö×Ö½Ú£¨Ä¬ÈÏ·Ö±ğÎª0XFFºÍ0X03£©£¬bufÎª×Ö½ÚÊı×é£¬lenÎª×Ö½ÚÊı×é³¤¶È
 {													  //ctr-----0x03±íÊ¾ÎªÊı¾İÖ¡ 0x01±íÊ¾ÎªackÖ¡ 0x02±íÊ¾ÎªsynÖ¡ 0x00ÎªfinÖ¡
@@ -58,6 +62,49 @@ U8* removeFrameHeadAndFCS(U8* buf,int len)//´«ÈëÖ¡´øÍ·µÄ×Ö½ÚÊı×éÈ¥Í·ºÍCRC16Ğ£ÑéÂ
 		new_buf[i] = buf[2 + i];
 	}
 	return new_buf;
+}
+
+void initialMacPortTable()
+{
+	for (int i = 0; i < 100; i++)
+	{
+		for (int j = 0; j < 3; j++)
+			mac_port_table[i][j] = -1;
+	}
+}
+
+
+int useMacPortTable(int s_mac1, int s_mac2, int in_port, int t_mac1, int t_mac2)//Ñ§Ï°²¢·µ»Ø³ö¶Ë¿Ú,·µ»Ø-1ÔòĞèÒª¹ã²¥
+{
+	int flag_empty = -1;//ÓÃÓÚ¼ÇÂ¼¿ÕÏĞµÄ¿Õ¼ä
+	int flag_exist = 0;//ÓÃÓÚÅĞ¶ÁÔ´macµØÖ·ÊÇ·ñ±»¼ÇÂ¼£¬0±íÊ¾Î´¼ÇÂ¼£¬1±íÊ¾¼ÇÂ¼
+	int out_port = -1;//ÓÃÓÚÄ¿µÄmacµØÖ·Ä¿±ê½»»»»ú¶ÔÓ¦µÄ¶Ë¿Ú
+	for (int i = 0; i < max_device_num; i++)
+	{
+		if (mac_port_table[i][2] == -1 && flag_empty == -1)
+		{
+			flag_empty = i;
+		}
+		if (mac_port_table[i][0] == s_mac1 &&
+			mac_port_table[i][1] == s_mac2 &&
+			mac_port_table[i][2] != -1)
+		{
+			flag_exist = 1;
+		}
+		if (mac_port_table[i][0] == t_mac1 &&
+			mac_port_table[i][1] == t_mac2 &&
+			mac_port_table[i][2] != -1)
+		{
+			out_port = mac_port_table[i][2];
+		}
+	}
+	if (flag_exist == 0)//Î´ÕÒµ½¶ÔÓ¦µÄÔ´mac£¬ÔòÌí¼Ó¼ÇÂ¼
+	{
+		mac_port_table[flag_empty][0] = s_mac1;
+		mac_port_table[flag_empty][1] = s_mac2;
+		mac_port_table[flag_empty][2] = in_port;
+	}
+	return out_port;
 }
 
 unsigned short int GICREN_CalcCRC16(unsigned char* data, unsigned char len)
@@ -337,6 +384,7 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 					case 0x03:
 						true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
 						iSndRetval = true_data_len / 8 - 4;
+						//Èç¹ûÊÇÊı¾İÖ¡£¬ÍùÉÏ½»
 						iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
 						iSndRetval = iSndRetval * 8;//»»Ëã³ÉÎ»,½øĞĞÍ³¼Æ
 						//·¢ËÍACKÈ·ÈÏ
@@ -595,5 +643,40 @@ U8* getFrame(U8* bit_data , int* len)
 		}
 	}
 	*len = j;
+	return return_bit_data;
+}
+
+int broadcast(U8* bit_data, int len, int ifNo)
+{
+	for (int i = 0; i < max_device_num; i++)
+	{
+		if (i==ifNo)
+		{
+			continue;
+		}
+		SendtoLower(bit_data, len, i);
+	}
+	return 1;
+}
+
+U8* getSrcDstAndTypeFromHead(U8* bit_data, int* src1, int* src2, int* dst1, int* dst2, int frame_type, int len)
+{
+	U8* byte_data = (U8*)malloc((len / 8) + 1);
+	int src, dst;
+	BitArrayToByteArray(bit_data, len, byte_data, (len / 8) + 1);
+	src = (int)byte_data[0];
+	*src1 = src / 2 / 2 / 2 / 2;
+	*src2 = src - *src1 * 2 * 2 * 2 * 2;
+	dst = (int)byte_data[1];
+	*dst1 = dst / 2 / 2 / 2 / 2;
+	*dst2 = dst - *dst1 * 2 * 2 * 2 * 2;
+	frame_type = (int)byte_data[2];
+	free(byte_data);
+
+	U8* return_bit_data = (U8*)malloc(len-4*8);
+	for (int i = 0; i < len- 4 * 8; i++)
+	{
+		return_bit_data[i] = bit_data[i + 4 * 8];
+	}
 	return return_bit_data;
 }
