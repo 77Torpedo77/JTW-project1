@@ -393,7 +393,7 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 					free(ack_ping_final_bufSend);
 					break;
 				case 3:
-
+					start_timeout_ping = 0;
 					//函��柴扮、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、
 					break;
 				default:
