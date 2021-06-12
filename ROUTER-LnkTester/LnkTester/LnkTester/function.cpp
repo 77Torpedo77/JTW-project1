@@ -42,6 +42,20 @@ U8* getFrame(U8* bit_data, int* len);
 int broadcast(U8* bit_data, int len, int ifNo);
 U8* getSrcDstAndTypeFromHead(U8* bit_data, int* src1, int* src2, int* dst1, int* dst2, int* frame_type, int len);
 
+//frame_type:1==数据帧，2==ping帧，3==确认帧
+U8* addSrcDstAndTypeToHead(U8* byte_data, int src1, int src2, int dst1, int dst2, int frame_type, int len)
+{
+	U8* new_byte_data = (U8*)malloc(sizeof(U8) * (len + 4));
+	new_byte_data[0] = (char)(src1 * 2 * 2 * 2 * 2 + src2);
+	new_byte_data[1] = (char)(dst1 * 2 * 2 * 2 * 2 + dst2); //左移四位再拼凑低四位
+	new_byte_data[2] = (char)frame_type;
+	if (len > 0)
+		for (int i = 0; i < len; i++)
+			new_byte_data[4 + i] = byte_data[i];
+
+	return new_byte_data;
+}
+
 U8* makeFrameHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地址和控制字段均为1个字节（默认分别为0XFF和0X03），buf为字节数组，len为字节数组长度
 {													  //ctr-----0x03表示为数据帧 0x01表示为ack帧 0x02表示为syn帧 0x00为fin帧
 	U8* new_buf = (U8*)malloc(sizeof(U8) * (len + 2));
@@ -194,9 +208,10 @@ void TimeOut()
 	if (start_timeout == 1)
 	{
 		time_count++;
-		if (time_count >= 100)//5000ms
+		if (time_count >= 10)//500ms
 		{
 			SendtoLower(resent_buf, resent_len, global_ifNo); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+			cout << "点到点ACK未收到\n";
 			time_count = 0;
 		}
 	}
@@ -216,6 +231,15 @@ void TimeOut()
 //输出：
 void RecvfromUpper(U8* buf, int len)
 {
+	int s_mac1;
+	int s_mac2;
+	int t_mac1;
+	int t_mac2;
+	U8* temp = (U8*)malloc(sizeof(U8) * len / 8);
+	BitArrayToByteArray(buf, len, temp, len / 8);
+	int sip = temp[0];
+	int tip = temp[1];
+	free(temp);
 	int iSndRetval;
 	U8* bufSend = NULL;
 	U8* fcs = NULL;
@@ -223,9 +247,17 @@ void RecvfromUpper(U8* buf, int len)
 	U8* new_buf = NULL;
 	U8* new_buf_head = NULL;
 	int return_data_len = 0;
+	s_mac1 = (sip - 356) >> 4;
+	s_mac2 = (sip - 356) - s_mac1 << 4;
+	t_mac1 = (tip - 356) >> 4;
+	t_mac2 = (tip - 356) % s_mac2 << 4;
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
-		new_buf_head = makeFrameHead(buf, 0x03, 0xff, len);
+		//加一个计时器，如果一段时间没收到lower的确认直接timeout
+		U8* buf_mac = addSrcDstAndTypeToHead(buf, s_mac1, s_mac2, t_mac1, t_mac2, 1, len);
+		len = len + 4;
+		new_buf_head = makeFrameHead(buf_mac, 0x03, 0xff, len);
+
 		len = len + 2;//多了头部2字节
 		U8* bit_buf = (U8*)malloc(sizeof(U8) * (len * 8));
 
@@ -245,7 +277,7 @@ void RecvfromUpper(U8* buf, int len)
 		bufSend = MakeFrame(new_buf, len + 2, &return_data_len);
 		iSndRetval = SendtoLower(bufSend, return_data_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
 		Sleep(50);
-		start_timeout = 1;//开始计时
+		start_timeout = 1;//点对点ack开始计时
 		free(new_buf);
 		free(fcs);
 		free(new_bit_buf);
@@ -303,6 +335,7 @@ void RecvfromUpper(U8* buf, int len)
 
 }
 
+
 //***************重要函数提醒******************************
 //名称：RecvfromLower
 //功能：本函数被调用时，意味着得到一份从低层实体递交上来的数据
@@ -316,66 +349,52 @@ void RecvfromUpper(U8* buf, int len)
 //输出：
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
-	int iSndRetval = 0;
 	global_ifNo = ifNo;
+	int iSndRetval = 0;
+	U8* bufSend = NULL;
 	//非接口0的数据，或者低层只有1个接口的数据，都向上递交
-	if (lowerMode[ifNo] == 0) {
-		//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交
-		U8* true_data = (U8*)malloc(sizeof(U8) * (len / 8 + 1));//true_data:去掉定位符的数据,bit数组
-		int true_data_len = 0;
-		true_data = getFrame(buf, &true_data_len);
-		int send_bit_data_copy_len = -1;
-		U8* send_bit_data_copy = NULL;
-		U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
-		BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
-		send_bit_data_copy = MakeFrame(true_data_byte, true_data_len / 8, &send_bit_data_copy_len);
-
-		//交换机逻辑初始化，在case里初始化报错
-		U8* geted_data_byte = NULL;
-		U8* geted_data_bit = (U8*)malloc((true_data_len / 8 - 4 )* 8);//true_data_len / 8 - 4 就是下面的iSndRetval，需要初始化所以搬上来了
-		int src1 = -1, src2 = -1, dst1 = -1, dst2 = -1, frame_type = -1;
-		int tran_port = -1;
-
-		if (checkCrc(true_data_byte, true_data_len/8))
-		{
-			switch (true_data_byte[1]) {
-				case 0x03:
-					SendtoLower(ack_array, 57, ifNo);
-					true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
-					iSndRetval = true_data_len / 8 - 4;
-					//如果是数据帧，往上交
-					//iSndRetval = SendtoUpper(true_data_byte, iSndRetval);
-					//iSndRetval = iSndRetval * 8;//换算成位,进行统计
-					//发送ACK确认
-
-					//以下是交换机逻辑
-					geted_data_byte = getSrcDstAndTypeFromHead(true_data_byte, &src1, &src2, &dst1, &dst2, &frame_type, iSndRetval);
-					tran_port = useMacPortTable(src1, src2, ifNo, dst1, dst2);//学习
-
-					ByteArrayToBitArray(geted_data_bit, iSndRetval * 8, geted_data_byte, iSndRetval);
-					if (tran_port == -1)
-					{
-						broadcast(send_bit_data_copy, send_bit_data_copy_len, ifNo);
-					}
-					else
-					{
-						SendtoLower(send_bit_data_copy, send_bit_data_copy_len, ifNo);
-					}
-					iSndRetval = send_bit_data_copy_len;//换算成位,进行统计
-					//SendtoLower(ack_array, 57 , ifNo);
-					break;
-				case 0x01:
-					//如果是确认帧，取消超时重传
-					start_timeout = 0;
-					break;
-			}
-		}
-		else //校验出错误
-		{
-				//不发ACK，什么都不干
+	U8* true_data = (U8*)malloc(sizeof(U8) * (len / 8 + 1));//true_data:去掉定位符的数据,bit数组
+	int true_data_len = 0;
+	true_data = getFrame(buf, &true_data_len);
+	U8* true_data_byte = (U8*)malloc(sizeof(U8) * (true_data_len / 8));
+	int dst1 = -1;
+	int dst2 = -1;
+	int src1 = -1;
+	int src2 = -1;
+	int frame_type = -1;
+	U8* upper_byte;
+	U8* ack_ping_temp = NULL;
+	U8* ack_ping_final = NULL;
+	U8* ack_ping_temp_bit = NULL;
+	U8* ack_ping_temp_bit_fcs = NULL;
+	U8* ack_ping_final_bufSend = NULL;
+	int return_data_len = 0;
+	U8 ack_ping[1] = { 0 };
+	BitArrayToByteArray(true_data, true_data_len, true_data_byte, true_data_len / 8);
+	if (checkCrc(true_data_byte, true_data_len / 8))
+	{
+		switch (true_data_byte[1]) {
+		case 0x03:
+			//发送ACK确认
+			SendtoLower(ack_array, 57, ifNo);
+			true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
+			iSndRetval = true_data_len / 8 - 4;
+			//解mac包
+			upper_byte = getSrcDstAndTypeFromHead(true_data_byte, &src1, &src2, &dst1, &dst2, &frame_type, iSndRetval);
+			iSndRetval = SendtoUpper(upper_byte, iSndRetval - 4);
+			iSndRetval = iSndRetval * 8;//换算成位,进行统计
+			break;
+		case 0x01:
+			//如果是确认帧，取消超时重传
+			start_timeout = 0;
+			break;
 		}
 	}
-		//统计
+	else //校验出错误
+	{
+		//不发ACK，什么都不干
+	}
+	//统计
 	if (iSndRetval <= 0) {
 		iSndErrorCount++;
 	}
@@ -383,10 +402,12 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 		iRcvToUpper += iSndRetval;
 		iRcvToUpperCount++;
 	}
+	//如果需要重传等机制，可能需要将buf或bufSend中的数据另外申请空间缓存起来
+
 	//打印
 	switch (iWorkMode % 10) {
 	case 1:
-		cout <<endl<< "接收接口 " << ifNo << " 数据：" << endl;
+		cout << endl << "接收接口 " << ifNo << " 数据：" << endl;
 		print_data_bit(buf, len, lowerMode[ifNo]);
 		break;
 	case 2:

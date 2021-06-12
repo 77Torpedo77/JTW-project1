@@ -21,6 +21,13 @@ int iRcvForwardCount = 0; //转发数据总次数
 int iRcvToUpper = 0;      //从低层递交高层数据总量
 int iRcvToUpperCount = 0;  //从低层递交高层数据总次数
 int iRcvUnknownCount = 0;  //收到不明来源数据总次数
+int router_table2[20][2] = {130,0,
+							146,0,};//路由表
+int router_table3[20][2] = { 130,0,
+							146,0,};//路由表
+int router_table4[20][2] = { 130,0,
+							146,0,};//路由表
+
 
 //打印统计信息
 void print_statistics();
@@ -156,94 +163,30 @@ void RecvfromUpper(U8* buf, int len)
 //输出：
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
+	//收上来的buf是byte
 	int iSndRetval;
-	U8* bufSend = NULL;
-	if (ifNo == 0 && lowerNumber > 1) {
-		//从接口0收到的数据，直接转发到接口1 —— 仅仅用于测试
-		if (lowerMode[0] == lowerMode[1]) {
-			//接口0和1的数据格式相同，直接转发
-			iSndRetval = SendtoLower(buf, len, 1);
-			if (lowerMode[0] == 1) {
-				iSndRetval = iSndRetval * 8;//如果接口格式为bit数组，统一换算成位，完成统计
-			}
-		}
-		else {
-			//接口0与接口1的数据格式不同，需要转换后，再发送
-			if (lowerMode[0] == 1) {
-				//从接口0到接口1，接口0是字节数组，接口1是比特数组，需要扩大8倍转换
-				bufSend = (U8*)malloc(len * 8);
-				if (bufSend == NULL) {
-					cout << "内存空间不够，导致数据没有被处理" << endl;
-					return;
-				}
-				//byte to bit
-				iSndRetval = ByteArrayToBitArray(bufSend, len * 8, buf, len);
-				iSndRetval = SendtoLower(bufSend, iSndRetval, 1);
-			}
-			else {
-				//从接口0到接口1，接口0是比特数组，接口1是字节数组，需要缩小八分之一转换
-				bufSend = (U8*)malloc(len / 8 + 1);
-				if (bufSend == NULL) {
-					cout << "内存空间不够，导致数据没有被处理" << endl;
-					return;
-				}
-				//bit to byte
-				iSndRetval = BitArrayToByteArray(buf, len, bufSend, len / 8 + 1);
-				iSndRetval = SendtoLower(bufSend, iSndRetval, 1);
+	int sip;
+	int tip;
+	U8* bittemp = (U8*)malloc(sizeof(U8) * (len * 8));
+	ByteArrayToBitArray(bittemp, sizeof(U8) * (len * 8), buf, len);
+	sip = buf[0];
+	tip = buf[1];
+	//if (tip == 84)
+	//{
 
-				iSndRetval = iSndRetval * 8;//换算成位，做统计
-
-			}
-		}
-		//统计
-		if (iSndRetval <= 0) {
-			iSndErrorCount++;
-		}
-		else {
+	//}
+	for (int i = 0; i <  20; i++)
+	{
+		if (router_table2[i][0] == tip)
+		{
+			iSndRetval = SendtoLower(bittemp, sizeof(U8) * (len * 8), router_table2[i][1]);
+			iSndRetval = iSndRetval * 8;//换算成位,进行统计
 			iRcvForward += iSndRetval;
 			iRcvForwardCount++;
 		}
 	}
-	else {
-		//非接口0的数据，或者低层只有1个接口的数据，都向上递交
-		if (lowerMode[ifNo] == 0) {
-			//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交
-			bufSend = (U8*)malloc(len / 8 + 1);
-			if (bufSend == NULL) {
-				cout << "内存空间不够，导致数据没有被处理" << endl;
-				return;
-			}
-			iSndRetval = BitArrayToByteArray(buf, len, bufSend, len / 8 + 1);
-			iSndRetval = SendtoUpper(bufSend, iSndRetval);
-			iSndRetval = iSndRetval * 8;//换算成位,进行统计
-
-		}
-		else {
-			//低层是字节数组接口，可直接递交
-			iSndRetval = SendtoUpper(buf, len);
-			iSndRetval = iSndRetval * 8;//换算成位，进行统计
-		}
-		//统计
-		if (iSndRetval <= 0) {
-			iSndErrorCount++;
-		}
-		else {
-			iRcvToUpper += iSndRetval;
-			iRcvToUpperCount++;
-		}
-	}
-	//如果需要重传等机制，可能需要将buf或bufSend中的数据另外申请空间缓存起来
-	if (bufSend != NULL) {
-		//缓存bufSend数据，如果有必要的话
-
-		//本例程中没有停等协议，bufSend的空间在用完以后需要释放
-		free(bufSend);
-	}
-	else {
-		//缓存buf里的数据，如果有必要的话
-
-		//buf空间不需要释放
-	}
+		
+	free(bittemp);
 
 	//打印
 	switch (iWorkMode % 10) {

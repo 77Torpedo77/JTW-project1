@@ -194,9 +194,10 @@ void TimeOut()
 	if (start_timeout == 1)
 	{
 		time_count++;
-		if (time_count >= 100)//5000ms
+		if (time_count >= 10)//500ms
 		{
 			SendtoLower(resent_buf, resent_len, global_ifNo); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+			cout << "点到点ACK未收到\n";
 			time_count = 0;
 		}
 	}

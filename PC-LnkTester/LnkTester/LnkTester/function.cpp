@@ -360,7 +360,7 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 		switch (true_data_byte[1]) {
 		case 0x03:
 			//∑¢ÀÕACK»∑»œ
-			SendtoLower(ack_array, 57, 0);
+			//SendtoLower(ack_array, 57, 0);
 			true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
 			iSndRetval = true_data_len / 8 - 4;
 

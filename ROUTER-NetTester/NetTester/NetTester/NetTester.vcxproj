@@ -156,6 +156,7 @@
     <ClCompile Include="CfgFileParms.cpp" />
     <ClCompile Include="function.cpp" />
     <ClCompile Include="NetTester.cpp" />
+    <ClCompile Include="ROUTER.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CfgFileParms.h" />
