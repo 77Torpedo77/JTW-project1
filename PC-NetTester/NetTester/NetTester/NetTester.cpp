@@ -8,6 +8,10 @@
 #include "CfgFileParms.h"
 #include "function.h"
 #pragma comment (lib,"wsock32.lib")
+#include <sstream>;
+
+extern int sip ;
+extern int tip ;
 
 
 //============重点来了================================================================================================
@@ -387,13 +391,20 @@ int main(int argc, char* argv[])
 	}
 	else {
 		//从键盘读取
-		cout << "请输入设备号：";
-		cin >> s1;
-		cout << "请输入层次名（大写）：";
-		cin >> s2;
-		//s2 = "NET";
-		cout << "请输入实体号：";
-		cin >> s3;
+		string s4;
+		string s5;
+		std::stringstream ss;
+		
+		cout << "输入sip（设备号+物理层实体号+50）：";
+		cin >> s4;
+		sip = atoi(s4.c_str());
+		ss<<((sip - 50) >> 4);
+		ss>>s1;
+		s2 = "NET";
+		s3 ="0";
+		cout << "输入tip（设备号+物理层实体号+50）：";
+		cin >> s5;
+		tip = atoi(s5.c_str());
 	}
 	WSAStartup(0x101, &wsa);
 	sock = socket(AF_INET, SOCK_DGRAM, 0);

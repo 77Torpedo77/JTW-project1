@@ -7,6 +7,10 @@
 #include "function.h"
 using namespace std;
 
+
+int sip = 0;
+int tip = 0;
+
 //以下为重要的变量
 U8* sendbuf;        //用来组织发送数据的缓存，大小为MAX_BUFFER_SIZE,可以在这个基础上扩充设计，形成适合的结构，例程中没有使用，只是提醒一下
 int printCount = 0; //打印控制
@@ -74,7 +78,18 @@ void TimeOut()
 	print_statistics();
 }
 //------------华丽的分割线，以下是数据的收发,--------------------------------------------
+U8* makeIpHead(U8* buf, int ctr, int addr, int len)//采用类似HDLC帧头格式，地址和控制字段均为1个字节（默认分别为0XFF和0X03），buf为字节数组，len为字节数组长度
+{													  //ctr-----0x03表示为数据帧 0x01表示为ack帧 0x02表示为syn帧 0x00为fin帧
+	U8* new_buf = (U8*)malloc(sizeof(U8) * (len + 2));
+	new_buf[0] = addr;
+	new_buf[1] = ctr;
+	if (len > 0)
+		for (int i = 0; i < len; i++)
+			new_buf[2 + i] = buf[i];
+	//free(buf);//释放原来buf
 
+	return new_buf;
+}
 //***************重要函数提醒******************************
 //名称：RecvfromUpper
 //功能：本函数被调用时，意味着收到一份高层下发的数据
@@ -89,16 +104,23 @@ void RecvfromUpper(U8* buf, int len)
 {
 	int iSndRetval;
 	U8* bufSend = NULL;
+	U8* new_bit_buf = NULL;
+	U8* new_buf = NULL;
+	U8* new_buf_head = NULL;
+	int return_data_len = 0;
+
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
+	lowerMode[0] = 0;
 	if (lowerMode[0] == 0) {
-		//接口0的模式为bit数组，先转换成bit数组，放到bufSend里
-		bufSend = (char*)malloc(len * 8);
-		if (bufSend == NULL) {
-			return;
-		}
-		iSndRetval = ByteArrayToBitArray(bufSend, len * 8, buf, len);
-		//发送
-		iSndRetval = SendtoLower(bufSend, iSndRetval, 0); //参数依次为数据缓冲，长度，接口号
+		new_buf_head = makeIpHead(buf, tip, sip, len);
+		len = len + 2;//多了头部2字节
+		U8* bit_buf = (U8*)malloc(sizeof(U8) * (len * 8));
+		ByteArrayToBitArray(bit_buf, len * 8, new_buf_head, len);
+
+		iSndRetval = SendtoLower(bit_buf, len * 8, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+		free(new_buf);
+		free(new_bit_buf);
+
 	}
 	else {
 		//下层是字节数组接口，可直接发送
@@ -107,10 +129,7 @@ void RecvfromUpper(U8* buf, int len)
 	}
 	//如果考虑设计停等协议等重传协议，这份数据需要缓冲起来，应该另外申请空间，把buf或bufSend的内容保存起来，以备重传
 	if (bufSend != NULL) {
-		//保存bufSend内容，CODES NEED HERE
 
-		//本例程没有设计重传协议，不需要保存数据，所以将空间释放
-		free(bufSend);
 	}
 	else {
 		//保存buf内容，CODES NEED HERE
@@ -156,108 +175,14 @@ void RecvfromUpper(U8* buf, int len)
 //输出：
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
-	int iSndRetval;
-	U8* bufSend = NULL;
-	if (ifNo == 0 && lowerNumber > 1) {
-		//从接口0收到的数据，直接转发到接口1 —— 仅仅用于测试
-		if (lowerMode[0] == lowerMode[1]) {
-			//接口0和1的数据格式相同，直接转发
-			iSndRetval = SendtoLower(buf, len, 1);
-			if (lowerMode[0] == 1) {
-				iSndRetval = iSndRetval * 8;//如果接口格式为bit数组，统一换算成位，完成统计
-			}
-		}
-		else {
-			//接口0与接口1的数据格式不同，需要转换后，再发送
-			if (lowerMode[0] == 1) {
-				//从接口0到接口1，接口0是字节数组，接口1是比特数组，需要扩大8倍转换
-				bufSend = (U8*)malloc(len * 8);
-				if (bufSend == NULL) {
-					cout << "内存空间不够，导致数据没有被处理" << endl;
-					return;
-				}
-				//byte to bit
-				iSndRetval = ByteArrayToBitArray(bufSend, len * 8, buf, len);
-				iSndRetval = SendtoLower(bufSend, iSndRetval, 1);
-			}
-			else {
-				//从接口0到接口1，接口0是比特数组，接口1是字节数组，需要缩小八分之一转换
-				bufSend = (U8*)malloc(len / 8 + 1);
-				if (bufSend == NULL) {
-					cout << "内存空间不够，导致数据没有被处理" << endl;
-					return;
-				}
-				//bit to byte
-				iSndRetval = BitArrayToByteArray(buf, len, bufSend, len / 8 + 1);
-				iSndRetval = SendtoLower(bufSend, iSndRetval, 1);
-
-				iSndRetval = iSndRetval * 8;//换算成位，做统计
-
-			}
-		}
-		//统计
-		if (iSndRetval <= 0) {
-			iSndErrorCount++;
-		}
-		else {
-			iRcvForward += iSndRetval;
-			iRcvForwardCount++;
-		}
+	U8* bytetemp = (U8*)malloc(sizeof(U8) * (len -2));
+	if (buf[1] == sip)
+	{
+		for (int i = 0; i < len  - 2; i++)
+			bytetemp[i] = buf[i + 2];
+		SendtoUpper(bytetemp, len -2);
 	}
-	else {
-		//非接口0的数据，或者低层只有1个接口的数据，都向上递交
-		if (lowerMode[ifNo] == 0) {
-			//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交
-			bufSend = (U8*)malloc(len / 8 + 1);
-			if (bufSend == NULL) {
-				cout << "内存空间不够，导致数据没有被处理" << endl;
-				return;
-			}
-			iSndRetval = BitArrayToByteArray(buf, len, bufSend, len / 8 + 1);
-			iSndRetval = SendtoUpper(bufSend, iSndRetval);
-			iSndRetval = iSndRetval * 8;//换算成位,进行统计
-
-		}
-		else {
-			//低层是字节数组接口，可直接递交
-			iSndRetval = SendtoUpper(buf, len);
-			iSndRetval = iSndRetval * 8;//换算成位，进行统计
-		}
-		//统计
-		if (iSndRetval <= 0) {
-			iSndErrorCount++;
-		}
-		else {
-			iRcvToUpper += iSndRetval;
-			iRcvToUpperCount++;
-		}
-	}
-	//如果需要重传等机制，可能需要将buf或bufSend中的数据另外申请空间缓存起来
-	if (bufSend != NULL) {
-		//缓存bufSend数据，如果有必要的话
-
-		//本例程中没有停等协议，bufSend的空间在用完以后需要释放
-		free(bufSend);
-	}
-	else {
-		//缓存buf里的数据，如果有必要的话
-
-		//buf空间不需要释放
-	}
-
-	//打印
-	switch (iWorkMode % 10) {
-	case 1:
-		cout <<endl<< "接收接口 " << ifNo << " 数据：" << endl;
-		print_data_bit(buf, len, lowerMode[ifNo]);
-		break;
-	case 2:
-		cout << endl << "接收接口 " << ifNo << " 数据：" << endl;
-		print_data_byte(buf, len, lowerMode[ifNo]);
-		break;
-	case 0:
-		break;
-	}
+	free(bytetemp);
 
 }
 void print_statistics()

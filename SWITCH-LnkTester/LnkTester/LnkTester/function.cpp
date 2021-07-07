@@ -194,10 +194,9 @@ void TimeOut()
 	if (start_timeout == 1)
 	{
 		time_count++;
-		if (time_count >= 10)//500ms
+		if (time_count >= 100)//5000ms
 		{
 			SendtoLower(resent_buf, resent_len, global_ifNo); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
-			cout << "点到点ACK未收到\n";
 			time_count = 0;
 		}
 	}
@@ -318,7 +317,14 @@ void RecvfromUpper(U8* buf, int len)
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
 	int iSndRetval = 0;
+	
 	global_ifNo = ifNo;
+	static int initflag = 1;
+	if (initflag)
+	{
+		initialMacPortTable();
+		initflag = 0;
+	}
 	//非接口0的数据，或者低层只有1个接口的数据，都向上递交
 	if (lowerMode[ifNo] == 0) {
 		//如果接口0是比特数组格式，高层默认是字节数组，先转换成字节数组，再向上递交
@@ -360,7 +366,7 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 					}
 					else
 					{
-						SendtoLower(send_bit_data_copy, send_bit_data_copy_len, ifNo);
+						SendtoLower(send_bit_data_copy, send_bit_data_copy_len, tran_port);
 					}
 					iSndRetval = send_bit_data_copy_len;//换算成位,进行统计
 					//SendtoLower(ack_array, 57 , ifNo);

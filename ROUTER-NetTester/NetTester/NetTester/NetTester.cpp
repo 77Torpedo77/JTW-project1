@@ -387,13 +387,15 @@ int main(int argc, char* argv[])
 	}
 	else {
 		//从键盘读取
-		cout << "请输入设备号：";
-		cin >> s1;
-		cout << "请输入层次名（大写）：";
-		cin >> s2;
-		//s2 = "NET";
-		cout << "请输入实体号：";
-		cin >> s3;
+		//cout << "请输入设备号：";
+		//cin >> s1;
+		s1 = "2";
+		//cout << "请输入层次名（大写）：";
+		//cin >> s2;
+		s2 = "NET";
+		//cout << "请输入实体号：";
+		//cin >> s3;
+		s3 = "0";
 	}
 	WSAStartup(0x101, &wsa);
 	sock = socket(AF_INET, SOCK_DGRAM, 0);

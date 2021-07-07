@@ -26,6 +26,7 @@ struct sockaddr_in local_addr;      //本层实体地址
 struct sockaddr_in upper_addr;      //上层实体地址，一般情况下，上层实体只有1个
 struct sockaddr_in lower_addr[10];  //最多10个下层对象，数组下标就是下层实体的编号
 sockaddr_in cmd_addr;         //统一管理平台地址
+int shi_ti_hao = 0;
 
 //------------华丽的分割线，以下是定时器--------------------------------------------
 //基于select的定时器，目的是把数据的收发和定时都统一到一个事件驱动框架下
@@ -391,11 +392,11 @@ int main(int argc, char* argv[])
 		//cout << "请输入层次名（大写）：";
 		//cin >> s2;
 		////s2 = "NET";
-		//cout << "请输入实体号：";
-		//cin >> s3;
+		cout << "请输入实体号：";
+		cin >> s3;
 		s1 = '2';
 		s2 = "LNK";
-		s3 = '0';
+		shi_ti_hao = atoi(s3.c_str());
 	}
 	WSAStartup(0x101, &wsa);
 	sock = socket(AF_INET, SOCK_DGRAM, 0);

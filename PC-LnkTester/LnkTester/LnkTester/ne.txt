@@ -30,12 +30,10 @@
 #   PHY1
 #   PHY2 LNK1
 #   PHY3
-1 PHY0  LNK0 APP0
-2 PHY0  LNK0 
-   PHY1
-   PHY2
-3 PHY1  LNK0 APP0
-4 PHY2  LNK0 APP0
+1 PHY0  LNK0 NET0 APP0
+2 PHY0  LNK0 NET0 APP0
+   PHY1  LNK1
+3 PHY0  LNK0 NET0 APP0
 ---------------------------------------------------------
 #全网拓扑连接描述区域，请注意参数中的标点符号都是英文格式
 #	点到点连接，格式 : A设备号,物理层接口号--B设备号,物理层接口号
@@ -43,8 +41,7 @@
 #先写哪个设备都行
 #每一行一条链接，中间不留空格
 1,0--2,0
-2,1--3,1
-2,2--4,2
+2,1--3,0
 ---------------------------------------------------------
 #统一控制平台的工作位置，等号不留空格
 cmdIpAddr=127.0.0.1
@@ -69,6 +66,10 @@ deviceID = 1
 			myAddr = 10
 			lowerMode = 0
 		------------------------------
+	layer = NET
+		entityID = 0
+			lowerMode0 =0
+		-----------------------------		
 	layer = APP
 		entityID = 0
 			workMode = 0
@@ -88,16 +89,19 @@ deviceID = 2
 			bufferSize = 80000
 			upperMode = 0
 		-----------------------------
-		entityID = 2
-			errorProb = 20
-			bufferSize = 80000
-			upperMode = 0
-		-----------------------------
 	layer = LNK
 		entityID = 0
 			myAddr = 20
 			lowerMode0 = 0
 			lowerMode1 = 0
+		-----------------------------
+		entityID = 1
+			myAddr = 41
+			lowerMode0 = 0
+		------------------------------
+	layer = NET
+		entityID = 0
+			myAddr = 40
 		------------------------------
 	layer = APP
 		entityID = 0
@@ -108,7 +112,7 @@ deviceID = 2
 ----------------------------------------------------------
 deviceID = 3
 	layer = PHY
-		entityID = 1
+		entityID = 0
 			errorProb = 20
 			bufferSize = 80000
 			upperMode = 0
@@ -118,29 +122,14 @@ deviceID = 3
 			myAddr = 30
 			lowerMode = 0
 		------------------------------
-	layer = APP
+	layer = NET
 		entityID = 0
-			workMode = 0
-			myAddr = 3
-			autoSendTime = 10
-			autoSendSize = 100
-----------------------------------------------------------
-deviceID = 4
-	layer = PHY
-		entityID = 2
-			errorProb = 20
-			bufferSize = 80000
-			upperMode = 0
-		-----------------------------
-	layer = LNK
-		entityID = 0
-			myAddr = 40
-			lowerMode = 0
+			myAddr = 6
 		------------------------------
 	layer = APP
 		entityID = 0
 			workMode = 0
-			myAddr = 4
+			myAddr = 3
 			autoSendTime = 10
 			autoSendSize = 100
 ----------------------------------------------------------

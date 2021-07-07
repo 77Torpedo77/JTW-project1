@@ -400,21 +400,23 @@ int main(int argc, char* argv[])
 		//cout << "请输入实体号：";
 		//cin >> s3;
 		//s1 = '2';
+		s_mac1 = atoi(s1.c_str());
+		s_mac2 = 0;
 		s2 = "LNK";
 		s3 = '0';
-		s_mac1 = atoi(s1.c_str());	
+		//s_mac1 = atoi(s1.c_str());	
 
-		cout << "请输入自己的物理层实体号：";
-		cin >> s4;
-		s_mac2 = atoi(s4.c_str());
+		//cout << "请输入自己的物理层实体号：";
+		//cin >> s4;
+		//s_mac2 = atoi(s4.c_str());
 
-		cout << "请输入目标设备号：";
-		cin >> s4;
-		t_mac1 = atoi(s4.c_str());
+		//cout << "请输入目标设备号：";
+		//cin >> s4;
+		//t_mac1 = atoi(s4.c_str());
 
-		cout << "请输入目标物理层实体号：";
-		cin >> s4;
-		t_mac2 = atoi(s4.c_str());
+		//cout << "请输入目标物理层实体号：";
+		//cin >> s4;
+		//t_mac2 = atoi(s4.c_str());
 		
 	}
 	WSAStartup(0x101, &wsa);

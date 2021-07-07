@@ -7,13 +7,16 @@
 #7、例程的应用层使用的autoSendSize是自动发送的数据长度，单位是bit
 #8、层间接口数据格式用lowerMode和upperMode参数表示，同一个设备下层对上的upperMode与上层对下的lowerMode之间要相同。默认值为0——比特数组流。尤其要注意物理层的uppMode参数。
 #9、全网可设定一个统一的观测点，CmdIpAddr和CmdPort，用来接收带外命令的，比如统一关机，发送特定数据等，也可用来收集各网元各层状态信息，做集中展示，
-#10、本例为仿真两个相连的网元，每个网元只有一个高层
-#    网元1                                     网元2
-#  APP层实体0  11400           APP层实体0 12400
-#      |                                           |    
-#  PHY层实体0  11100           PHY层实体0 12100
-#      |                                           |       
-#      —————————————
+10、每个实体都有一个myCmdAddr和myCmdPort，这是用来接收带外命令的，比如统一关机，发送特定数据等，还可再增加类似CenterAddr和CenterPort,用来做集中展示，建议端口号从2XXXX开始
+
+           网元1                              网元2                                                                网元3
+  APP层实体0  11400                                                                       APP层实体0 13400
+      |                                                                                                        |
+  LNK层实体0  11200                LNK层实体0 12200                            LNK层实体0 13200
+      |                                        |                       |                                        |
+  PHY层实体0                PHY层实体0       PHY层实体1                        PHY层实体1
+      |               11100                 |    12100         |    12101                           |     13100
+      ————————————                        ————————————
 ---------------------------------------------------------
 #每个网元的层次结构描述
 #不支持一个低层实体同时关联多个高层实体。
@@ -27,8 +30,10 @@
 #   PHY1
 #   PHY2 LNK1
 #   PHY3
-1 PHY0  APP0
-2 PHY0  APP0
+1 PHY0  LNK0 NET0 APP0
+2 PHY0  LNK0 NET0 APP0
+   PHY1  LNK1
+3 PHY0  LNK0 NET0 APP0
 ---------------------------------------------------------
 #全网拓扑连接描述区域，请注意参数中的标点符号都是英文格式
 #	点到点连接，格式 : A设备号,物理层接口号--B设备号,物理层接口号
@@ -36,40 +41,95 @@
 #先写哪个设备都行
 #每一行一条链接，中间不留空格
 1,0--2,0
+2,1--3,0
 ---------------------------------------------------------
 #统一控制平台的工作位置，等号不留空格
 cmdIpAddr=127.0.0.1
 cmdPort=20000
+phySlotTime = 20
+trafficPlotRate = 100
+errorProb = 20
+bufferSize = 80000
+heartBeatingTime = 50
 ---------------------------------------------------------
 #其它参数区域，存放实验者自行定义的各种参数，如果用例程中的cfgFileParms类，通过getValueInt和getValueStr，提供参数名，就能得到参数值
 #除了开头三行必须保持顺序：deviceID，layer,entity,其他参数行的位置可以交换，没有写出来的物理层实体参数，程序会使用默认参数
 deviceID = 1
 	layer = PHY
 		entityID = 0
-			errorProb = 0
+			errorProb = 20
 			bufferSize = 80000
 			upperMode = 0
 		-----------------------------
+	layer = LNK
+		entityID = 0
+			myAddr = 10
+			myAddr = 6
+		------------------------------
+	layer = NET
+		entityID = 0
+			lowerMode0 = 1
+		-----------------------------		
 	layer = APP
 		entityID = 0
 			workMode = 0
 			myAddr = 1
 			autoSendTime = 10
-			autoSendSize = 2
-			lowerMode = 0
+			autoSendSize = 100
 ----------------------------------------------------------
 deviceID = 2
 	layer = PHY
 		entityID = 0
-			errorProb = 0
+			errorProb = 20
 			bufferSize = 80000
 			upperMode = 0
 		-----------------------------
+		entityID = 1
+			errorProb = 20
+			bufferSize = 80000
+			upperMode = 0
+		-----------------------------
+	layer = LNK
+		entityID = 0
+			myAddr = 20
+			lowerMode0 = 0
+			lowerMode1 = 0
+		-----------------------------
+		entityID = 1
+			myAddr = 41
+			lowerMode0 = 0
+		------------------------------
+	layer = NET
+		entityID = 0
+			myAddr = 40
+		------------------------------
 	layer = APP
 		entityID = 0
-			myAddr = 2
 			workMode = 0
+			myAddr = 2
 			autoSendTime = 10
-			autoSendSize = 2
+			autoSendSize = 100
+----------------------------------------------------------
+deviceID = 3
+	layer = PHY
+		entityID = 0
+			errorProb = 20
+			bufferSize = 80000
+			upperMode = 0
+		-----------------------------
+	layer = LNK
+		entityID = 0
+			myAddr = 30
 			lowerMode = 0
+		------------------------------
+	layer = NET
+		entityID = 0
+			myAddr = 6
+		------------------------------
+	layer = APP
+		entityID = 0
+			workMode = 0
+			myAddr = 3
+			autoSendTime = 10
+			autoSendSize = 100
 ----------------------------------------------------------

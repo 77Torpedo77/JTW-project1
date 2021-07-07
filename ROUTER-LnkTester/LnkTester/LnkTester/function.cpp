@@ -32,7 +32,8 @@ int resent_len = 0;//重传长度记录
 U8 ack_array[57] = { 0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0 };//ack帧
 #define max_device_num 100//最大设备数
 int mac_port_table[max_device_num][3];//第一行第一列第二例是对应的mac值（我们定义的mac值由网元编号加PHY层实体号组成），第三列为进入交换机的端口号（即PHY层实体号）
-int global_ifNo = -1;
+int global_ifNo = -1;//用于超时重传判断ifno
+extern int shi_ti_hao;
 
 //打印统计信息
 void print_statistics();
@@ -231,15 +232,16 @@ void TimeOut()
 //输出：
 void RecvfromUpper(U8* buf, int len)
 {
+	//buf是bit
+	len = len / 8;
 	int s_mac1;
 	int s_mac2;
 	int t_mac1;
 	int t_mac2;
-	U8* temp = (U8*)malloc(sizeof(U8) * len / 8);
-	BitArrayToByteArray(buf, len, temp, len / 8);
-	int sip = temp[0];
-	int tip = temp[1];
-	free(temp);
+	U8* byte_temp = (U8*)malloc(sizeof(U8) * len);
+	BitArrayToByteArray(buf, len*8, byte_temp, len);
+	int sip = byte_temp[0];
+	int tip = byte_temp[1];
 	int iSndRetval;
 	U8* bufSend = NULL;
 	U8* fcs = NULL;
@@ -247,15 +249,15 @@ void RecvfromUpper(U8* buf, int len)
 	U8* new_buf = NULL;
 	U8* new_buf_head = NULL;
 	int return_data_len = 0;
-	s_mac1 = (sip - 356) >> 4;
-	s_mac2 = (sip - 356) - s_mac1 << 4;
-	t_mac1 = (tip - 356) >> 4;
-	t_mac2 = (tip - 356) % s_mac2 << 4;
+	s_mac1 = (sip - 50) / 16;
+	s_mac2 = (sip - 50) % 16;
+	t_mac1 = (tip - 50) / 16;
+	t_mac2 = (tip - 50) % 16;
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
 		//加一个计时器，如果一段时间没收到lower的确认直接timeout
-		U8* buf_mac = addSrcDstAndTypeToHead(buf, s_mac1, s_mac2, t_mac1, t_mac2, 1, len);
-		len = len + 4;
+		U8* buf_mac = addSrcDstAndTypeToHead(byte_temp, s_mac1, s_mac2, t_mac1, t_mac2, 1, len);
+		len = len + 4;//包含帧类型和保留段，所以是4
 		new_buf_head = makeFrameHead(buf_mac, 0x03, 0xff, len);
 
 		len = len + 2;//多了头部2字节
@@ -275,7 +277,9 @@ void RecvfromUpper(U8* buf, int len)
 
 		BitArrayToByteArray(new_bit_buf, len * 8 + 16, new_buf, len + 2);
 		bufSend = MakeFrame(new_buf, len + 2, &return_data_len);
-		iSndRetval = SendtoLower(bufSend, return_data_len, 0); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
+
+		//由于lnk层和phy层绑定，故直接写本层实体号即可传到对应端口
+		iSndRetval = SendtoLower(bufSend, return_data_len, shi_ti_hao); //参数依次为数据缓冲，长度，接口号>>>>>>>>发>>>>>>>>>>>>
 		Sleep(50);
 		start_timeout = 1;//点对点ack开始计时
 		free(new_buf);
@@ -285,8 +289,8 @@ void RecvfromUpper(U8* buf, int len)
 	}
 	else {
 		//下层是字节数组接口，可直接发送
-		iSndRetval = SendtoLower(buf, len, 0);
-		iSndRetval = iSndRetval * 8;//换算成位
+		//iSndRetval = SendtoLower(buf, len, 0);
+		//iSndRetval = iSndRetval * 8;//换算成位
 	}
 	//如果考虑设计停等协议等重传协议，这份数据需要缓冲起来，应该另外申请空间，把buf或bufSend的内容保存起来，以备重传
 	if (bufSend != NULL) {
@@ -334,7 +338,6 @@ void RecvfromUpper(U8* buf, int len)
 
 
 }
-
 
 //***************重要函数提醒******************************
 //名称：RecvfromLower

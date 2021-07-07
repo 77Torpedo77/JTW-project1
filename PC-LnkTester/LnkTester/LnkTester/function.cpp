@@ -228,6 +228,11 @@ void TimeOut()
 //输出：
 void RecvfromUpper(U8* buf, int len)
 {
+	U8* temp = (U8*)malloc(sizeof(U8) * len / 8);
+	BitArrayToByteArray(buf, len, temp, len / 8);
+	int sip = temp[0];
+	int tip = temp[1];
+	free(temp);
 	int iSndRetval;
 	U8* bufSend = NULL;
 	U8* fcs = NULL;
@@ -235,6 +240,10 @@ void RecvfromUpper(U8* buf, int len)
 	U8* new_buf = NULL;
 	U8* new_buf_head = NULL;
 	int return_data_len = 0;
+	s_mac1 = (sip - 50) / 16;
+	s_mac2 = (sip - 50) % 16;
+	t_mac1 = (tip - 50) / 16;
+	t_mac2 = (tip - 50) % 16;
 	//是高层数据，只从接口0发出去,高层接口默认都是字节流数据格式
 	if (lowerMode[0] == 0) {
 		//加一个计时器，如果一段时间没收到lower的确认直接timeout
@@ -312,12 +321,6 @@ void RecvfromUpper(U8* buf, int len)
 		break;
 	}
 
-
-
-
-
-
-
 }
 
 //***************重要函数提醒******************************
@@ -360,7 +363,7 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 		switch (true_data_byte[1]) {
 		case 0x03:
 			//发送ACK确认
-			//SendtoLower(ack_array, 57, 0);
+			SendtoLower(ack_array, 57, 0);
 			true_data_byte = removeFrameHeadAndFCS(true_data_byte, true_data_len / 8);
 			iSndRetval = true_data_len / 8 - 4;
 

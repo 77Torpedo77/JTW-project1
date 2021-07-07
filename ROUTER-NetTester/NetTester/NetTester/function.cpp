@@ -21,8 +21,8 @@ int iRcvForwardCount = 0; //转发数据总次数
 int iRcvToUpper = 0;      //从低层递交高层数据总量
 int iRcvToUpperCount = 0;  //从低层递交高层数据总次数
 int iRcvUnknownCount = 0;  //收到不明来源数据总次数
-int router_table2[20][2] = {130,0,
-							146,0,};//路由表
+int router_table2[20][2] = {98,1,
+							66,0,};//路由表
 int router_table3[20][2] = { 130,0,
 							146,0,};//路由表
 int router_table4[20][2] = { 130,0,
@@ -163,14 +163,15 @@ void RecvfromUpper(U8* buf, int len)
 //输出：
 void RecvfromLower(U8* buf, int len, int ifNo)
 {
-	//收上来的buf是byte
+	//收上来的buf是bit
+	int success_tran = 0;
 	int iSndRetval;
 	int sip;
 	int tip;
-	U8* bittemp = (U8*)malloc(sizeof(U8) * (len * 8));
-	ByteArrayToBitArray(bittemp, sizeof(U8) * (len * 8), buf, len);
-	sip = buf[0];
-	tip = buf[1];
+	U8* byte_temp = (U8*)malloc(sizeof(U8) * (len / 8));
+	BitArrayToByteArray(buf, len, byte_temp, sizeof(U8) * (len / 8));
+	sip = byte_temp[0];
+	tip = byte_temp[1];
 	//if (tip == 84)
 	//{
 
@@ -179,14 +180,19 @@ void RecvfromLower(U8* buf, int len, int ifNo)
 	{
 		if (router_table2[i][0] == tip)
 		{
-			iSndRetval = SendtoLower(bittemp, sizeof(U8) * (len * 8), router_table2[i][1]);
-			iSndRetval = iSndRetval * 8;//换算成位,进行统计
+			iSndRetval = SendtoLower(buf, len, router_table2[i][1]);
+			printf("\n成功转发 %d(%x)----->>>%d(%x)\n", sip,sip,tip,tip);
+			success_tran = 1;
+			//iSndRetval = iSndRetval * 8;//换算成位,进行统计
 			iRcvForward += iSndRetval;
 			iRcvForwardCount++;
 		}
 	}
-		
-	free(bittemp);
+	if (success_tran == 0)
+	{
+		//printf("路由表中无路由信息");
+	}
+	free(byte_temp);
 
 	//打印
 	switch (iWorkMode % 10) {
